@@ -146,6 +146,14 @@ public class GTRecipeTypes {
             .setSound(GTSoundEntries.COMPRESSOR)
             .register();
 
+    /**
+     * The recipe type cable insulation and coils are made in: the Spooler's, or the Assembler's if the config says so.
+     */
+    public static GTRecipeTypeEntry spooling() {
+        return com.gregtechceu.gtceu.config.ConfigHolder.getInstance().recipes.useSpooler ? SPOOLING_RECIPES :
+                ASSEMBLER_RECIPES;
+    }
+
     public static final GTRecipeTypeEntry WELDER_RECIPES = REGISTRATE.recipeType("welder", ELECTRIC)
             .setMaxIOSize(4, 1, 1, 0)
             .setEUIO(IO.IN)

@@ -9,10 +9,6 @@ import com.gregtechceu.gtceu.common.data.machines.GTMultiMachines;
 import com.gregtechceu.gtceu.common.fluid.potion.PotionFluid;
 import com.gregtechceu.gtceu.common.fluid.potion.PotionFluidHelper;
 import com.gregtechceu.gtceu.common.item.behavior.IntCircuitBehaviour;
-import com.gregtechceu.gtceu.config.ConfigHolder;
-import com.gregtechceu.gtceu.integration.recipeviewer.emi.orevein.GTBedrockFluidEmiCategory;
-import com.gregtechceu.gtceu.integration.recipeviewer.emi.orevein.GTBedrockOreEmiCategory;
-import com.gregtechceu.gtceu.integration.recipeviewer.emi.orevein.GTOreVeinEmiCategory;
 import com.gregtechceu.gtceu.integration.recipeviewer.emi.recipe.GTModuleEMIRecipe;
 import com.gregtechceu.gtceu.integration.recipeviewer.emi.recipe.GTRecipeEMICategory;
 
@@ -48,41 +44,22 @@ public class GTEMIPlugin implements EmiPlugin {
         }
 
         // Categories
-        registry.addCategory(MultiblockInfoEmiCategory.CATEGORY);
+        // the multiblock, ore and bedrock pages come first
+        GTViewerEmi.register(registry, true);
         registry.addCategory(GTModuleEMIRecipe.CATEGORY);
-        if (!ConfigHolder.INSTANCE.compat.hideOreProcessingDiagrams)
-            registry.addCategory(GTOreProcessingEmiCategory.CATEGORY);
-        registry.addCategory(GTOreVeinEmiCategory.CATEGORY);
-        registry.addCategory(GTBedrockFluidEmiCategory.CATEGORY);
-        if (ConfigHolder.INSTANCE.machines.doBedrockOres)
-            registry.addCategory(GTBedrockOreEmiCategory.CATEGORY);
         for (GTRecipeCategory category : GTRegistries.RECIPE_CATEGORIES) {
             if (category.shouldRegisterDisplays()) {
                 registry.addCategory(GTRecipeEMICategory.CATEGORIES.apply(category));
             }
         }
-        registry.addCategory(ProgrammedCircuitEmiCategory.CATEGORY);
 
         // Recipes
-        MultiblockInfoEmiCategory.registerDisplays(registry);
         GTRecipeEMICategory.registerDisplays(registry);
-        if (!ConfigHolder.INSTANCE.compat.hideOreProcessingDiagrams)
-            GTOreProcessingEmiCategory.registerDisplays(registry);
-        GTOreVeinEmiCategory.registerDisplays(registry);
-        GTBedrockFluidEmiCategory.registerDisplays(registry);
-        if (ConfigHolder.INSTANCE.machines.doBedrockOres)
-            GTBedrockOreEmiCategory.registerDisplays(registry);
-        ProgrammedCircuitEmiCategory.registerDisplays(registry);
+        GTViewerEmi.register(registry, false);
         GTModuleEMIRecipe.addRecipes(registry);
 
         // workstations
         GTRecipeEMICategory.registerWorkStations(registry);
-        if (!ConfigHolder.INSTANCE.compat.hideOreProcessingDiagrams)
-            GTOreProcessingEmiCategory.registerWorkStations(registry);
-        GTOreVeinEmiCategory.registerWorkStations(registry);
-        GTBedrockFluidEmiCategory.registerWorkStations(registry);
-        if (ConfigHolder.INSTANCE.machines.doBedrockOres)
-            GTBedrockOreEmiCategory.registerWorkStations(registry);
         registry.addWorkstation(GTRecipeEMICategory.CATEGORIES.apply(GTRecipeTypes.CHEMICAL_RECIPES.getCategory()),
                 EmiStack.of(GTMultiMachines.LARGE_CHEMICAL_REACTOR));
         registry.addWorkstation(GTModuleEMIRecipe.CATEGORY,
@@ -94,7 +71,6 @@ public class GTEMIPlugin implements EmiPlugin {
         registry.setDefaultComparison(GTItems.PROGRAMMED_CIRCUIT.asItem(), Comparison.compareComponents());
         registry.removeEmiStacks(EmiStack.of(GTItems.PROGRAMMED_CIRCUIT.asStack()));
         registry.addEmiStack(EmiStack.of(IntCircuitBehaviour.stack(0)));
-        registry.addWorkstation(ProgrammedCircuitEmiCategory.CATEGORY, EmiStack.of(IntCircuitBehaviour.stack(0)));
 
         Comparison potionComparison = Comparison.compareData(
                 stack -> stack.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY));

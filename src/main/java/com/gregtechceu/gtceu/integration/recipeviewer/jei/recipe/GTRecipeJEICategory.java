@@ -1,27 +1,24 @@
 package com.gregtechceu.gtceu.integration.recipeviewer.jei.recipe;
 
 import com.gregtechceu.gtceu.GTCEu;
-import com.gregtechceu.gtceu.api.capability.recipe.FluidRecipeCapability;
-import com.gregtechceu.gtceu.api.capability.recipe.ItemRecipeCapability;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.GTRecipe;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
 import com.gregtechceu.gtceu.api.recipe.category.GTRecipeCategory;
 import com.gregtechceu.gtceu.api.recipe.gui.GTRecipeViewerWidget;
+import com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerVisibility;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
 import com.gregtechceu.gtceu.common.data.GTRecipeTypes;
+import com.gregtechceu.gtceu.integration.recipeviewer.jei.GTJeiIngredients;
 
 import net.minecraft.Util;
 import net.minecraft.network.chat.Component;
 
-import brachy.modularui.integration.jei.JeiIngredientHandler;
 import brachy.modularui.integration.jei.recipe.ModularUIJeiCategory;
 import mezz.jei.api.constants.RecipeTypes;
-import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.helpers.IJeiHelpers;
-import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.RecipeType;
@@ -72,46 +69,20 @@ public class GTRecipeJEICategory extends ModularUIJeiCategory<GTRecipe> {
 
     @Override
     public void setupRecipeIngredients(IRecipeLayoutBuilder builder, GTRecipe recipe, IFocusGroup focuses) {
-        var itemIn = recipe.getInputContents(ItemRecipeCapability.CAP);
-        var fluidIn = recipe.getInputContents(FluidRecipeCapability.CAP);
-        var itemOut = recipe.getOutputContents(ItemRecipeCapability.CAP);
-        var fluidOut = recipe.getOutputContents(FluidRecipeCapability.CAP);
+        addContents(builder, RecipeIngredientRole.INPUT, recipe.inputs);
+        addContents(builder, RecipeIngredientRole.OUTPUT, recipe.outputs);
+    }
 
-        for (var itemContent : itemIn) {
-            var mapped = ItemRecipeCapability
-                    .mapIngredientToEntryList(ItemRecipeCapability.CAP.of(itemContent.content()));
-
-            JeiIngredientHandler.toJeiIngredient(mapped).forEach(
-                    stack -> builder.addInvisibleIngredients(RecipeIngredientRole.INPUT)
-                            .addIngredient(VanillaTypes.ITEM_STACK, stack));
-        }
-
-        for (var fluidContent : fluidIn) {
-            var mapped = FluidRecipeCapability
-                    .mapIngredientToEntryList(FluidRecipeCapability.CAP.of(fluidContent.content()));
-
-            JeiIngredientHandler.toJeiIngredient(mapped).forEach(
-                    stack -> builder.addInvisibleIngredients(RecipeIngredientRole.INPUT)
-                            .addIngredient(NeoForgeTypes.FLUID_STACK, stack));
-        }
-
-        for (var itemContent : itemOut) {
-            var mapped = ItemRecipeCapability
-                    .mapIngredientToEntryList(ItemRecipeCapability.CAP.of(itemContent.content()));
-
-            JeiIngredientHandler.toJeiIngredient(mapped)
-                    .forEach(stack -> builder.addInvisibleIngredients(RecipeIngredientRole.OUTPUT)
-                            .addIngredient(VanillaTypes.ITEM_STACK, stack));
-        }
-
-        for (var fluidContent : fluidOut) {
-            var mapped = FluidRecipeCapability
-                    .mapIngredientToEntryList(FluidRecipeCapability.CAP.of(fluidContent.content()));
-
-            JeiIngredientHandler.toJeiIngredient(mapped).forEach(
-                    stack -> builder.addInvisibleIngredients(RecipeIngredientRole.OUTPUT)
-                            .addIngredient(NeoForgeTypes.FLUID_STACK, stack));
-        }
+    private static void addContents(IRecipeLayoutBuilder builder, RecipeIngredientRole role,
+                                    java.util.Map<com.gregtechceu.gtceu.api.capability.recipe.RecipeCapability<?>, List<com.gregtechceu.gtceu.api.recipe.content.Content>> contents) {
+        contents.keySet().stream().sorted(com.gregtechceu.gtceu.api.capability.recipe.RecipeCapability.COMPARATOR)
+                .forEach(cap -> {
+                    for (var content : contents.get(cap)) {
+                        for (var entry : cap.toViewerEntries(content)) {
+                            GTJeiIngredients.addInvisible(builder, role, entry);
+                        }
+                    }
+                });
     }
 
     public static void registerRecipes(IRecipeRegistration registration) {
@@ -126,14 +97,16 @@ public class GTRecipeJEICategory extends ModularUIJeiCategory<GTRecipe> {
                 subCategories.add(category);
                 continue;
             }
-            var wrapped = List.copyOf(type.getRecipesInCategory(category));
+            var wrapped = type.getRecipesInCategory(category).stream()
+                    .filter(r -> GTViewerVisibility.isVisible(category.id, r.getId(), r)).toList();
             registration.addRecipes(TYPES.apply(category), wrapped);
         }
         // run subcategories
         for (GTRecipeCategory subCategory : subCategories) {
             if (!subCategory.shouldRegisterDisplays()) continue;
             var type = subCategory.getRecipeType();
-            var wrapped = List.copyOf(type.getRecipesInCategory(subCategory));
+            var wrapped = type.getRecipesInCategory(subCategory).stream()
+                    .filter(r -> GTViewerVisibility.isVisible(subCategory.id, r.getId(), r)).toList();
             registration.addRecipes(TYPES.apply(subCategory), wrapped);
         }
     }

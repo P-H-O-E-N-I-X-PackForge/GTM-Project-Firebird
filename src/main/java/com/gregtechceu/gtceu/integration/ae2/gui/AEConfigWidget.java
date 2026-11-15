@@ -1,6 +1,7 @@
 package com.gregtechceu.gtceu.integration.ae2.gui;
 
 import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
+import com.gregtechceu.gtceu.common.mui.GTMuiSync;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEFluidList;
 import com.gregtechceu.gtceu.integration.ae2.slot.ExportOnlyAEItemList;
 import com.gregtechceu.gtceu.integration.ae2.slot.IConfigurableSlotList;
@@ -134,7 +135,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
                 amountField.setText(resolved);
             }
             int slot = editingSlotIndex;
-            syncManager.callSyncedAction("ae_config_amount", buf -> {
+            GTMuiSync.call(syncManager, "ae_config_amount", buf -> {
                 buf.writeVarInt(slot);
                 buf.writeVarLong(amount);
             });
@@ -252,7 +253,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
 
         if (overConfig && !isAutoPull() && syncManager != null) {
             if (button == 1) {
-                syncManager.callSyncedAction("ae_config_clear", buf -> buf.writeVarInt(slotIndex));
+                GTMuiSync.call(syncManager, "ae_config_clear", buf -> buf.writeVarInt(slotIndex));
                 return Result.SUCCESS;
             } else if (button == 0) {
                 GenericStack config = configSyncHandler != null ? configSyncHandler.getClientConfig(slotIndex) : null;
@@ -260,14 +261,14 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
                 if (config != null && !holdingItem) {
                     openAmountEditor(slotIndex);
                 } else {
-                    syncManager.callSyncedAction("ae_config_set", buf -> buf.writeVarInt(slotIndex));
+                    GTMuiSync.call(syncManager, "ae_config_set", buf -> buf.writeVarInt(slotIndex));
                 }
                 return Result.SUCCESS;
             }
         }
 
         if (overStock && !isStocking() && !isFluid && button == 0 && syncManager != null) {
-            syncManager.callSyncedAction("ae_stock_pickup", buf -> buf.writeVarInt(slotIndex));
+            GTMuiSync.call(syncManager, "ae_stock_pickup", buf -> buf.writeVarInt(slotIndex));
             return Result.SUCCESS;
         }
 
@@ -294,7 +295,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
                 (scrollY > 0 ? current + 1L : current - 1L);
 
         if (next > 0 && next < Integer.MAX_VALUE + 1L && syncManager != null) {
-            syncManager.callSyncedAction("ae_config_amount", buf -> {
+            GTMuiSync.call(syncManager, "ae_config_amount", buf -> {
                 buf.writeVarInt(slotIndex);
                 buf.writeVarLong(next);
             });
@@ -314,7 +315,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
         if (isFluid) {
             FluidUtil.getFluidContained(ingredient).ifPresent(fluid -> {
                 if (!fluid.isEmpty()) {
-                    syncManager.callSyncedAction("ae_config_set_ghost", buf -> {
+                    GTMuiSync.call(syncManager, "ae_config_set_ghost", buf -> {
                         buf.writeVarInt(findTargetSlot());
                         buf.writeBoolean(true);
                         FluidStack.STREAM_CODEC.encode(buf, fluid);
@@ -322,7 +323,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
                 }
             });
         } else {
-            syncManager.callSyncedAction("ae_config_set_ghost", buf -> {
+            GTMuiSync.call(syncManager, "ae_config_set_ghost", buf -> {
                 buf.writeVarInt(slot);
                 buf.writeBoolean(false);
                 ItemStack.STREAM_CODEC.encode(buf, ingredient);
@@ -341,7 +342,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
             if (fluidStack.getAmount() <= 0) fluidStack.setAmount(1000);
             int slot = findTargetSlot();
             if (slot < 0) return false;
-            syncManager.callSyncedAction("ae_config_set_ghost", buf -> {
+            GTMuiSync.call(syncManager, "ae_config_set_ghost", buf -> {
                 buf.writeVarInt(slot);
                 buf.writeBoolean(true);
                 FluidStack.STREAM_CODEC.encode(buf, fluidStack);
@@ -353,7 +354,7 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
             if (itemStack.getCount() <= 0) itemStack.setCount(1);
             int slot = findTargetSlot();
             if (slot < 0) return false;
-            syncManager.callSyncedAction("ae_config_set_ghost", buf -> {
+            GTMuiSync.call(syncManager, "ae_config_set_ghost", buf -> {
                 buf.writeVarInt(slot);
                 buf.writeBoolean(false);
                 ItemStack.STREAM_CODEC.encode(buf, itemStack);

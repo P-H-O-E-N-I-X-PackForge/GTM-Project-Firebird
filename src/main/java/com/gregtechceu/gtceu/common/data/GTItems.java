@@ -252,6 +252,11 @@ public class GTItems {
     @SuppressWarnings("unchecked")
     public static final ItemEntry<Item>[] SHAPE_EXTRUDERS = new ItemEntry[27];
     public static ItemEntry<Item> SHAPE_EXTRUDER_PLATE;
+    public static ItemEntry<Item> SHAPE_EXTRUDER_ROD;
+    public static ItemEntry<Item> SHAPE_EXTRUDER_BOLT;
+    public static ItemEntry<Item> SHAPE_EXTRUDER_GEAR;
+    public static ItemEntry<Item> SHAPE_EXTRUDER_GEAR_SMALL;
+    public static ItemEntry<Item> SHAPE_EXTRUDER_ROTOR;
     public static ItemEntry<Item> SHAPE_EXTRUDER_RING;
     public static ItemEntry<Item> SHAPE_EXTRUDER_CELL;
     public static ItemEntry<Item> SHAPE_EXTRUDER_INGOT;
@@ -321,6 +326,47 @@ public class GTItems {
                 .onRegister(
                         materialInfo(() -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
                 .register();
+        // The molds the old Lathe and Extruder recipes used, only with the legacyExtruderMolds config
+        if (ConfigHolder.getInstance().recipes.legacyExtruderMolds) {
+            SHAPE_EXTRUDERS[1] = SHAPE_EXTRUDER_ROD = REGISTRATE.item("rod_extruder_mold", Item::new)
+                    .lang("Extruder Mold (Rod)")
+                    .onRegister(
+                            materialInfo(
+                                    () -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
+                    .register();
+        }
+        if (ConfigHolder.getInstance().recipes.legacyExtruderMolds) {
+            SHAPE_EXTRUDERS[2] = SHAPE_EXTRUDER_BOLT = REGISTRATE.item("bolt_extruder_mold", Item::new)
+                    .lang("Extruder Mold (Bolt)")
+                    .onRegister(
+                            materialInfo(
+                                    () -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
+                    .register();
+        }
+        if (ConfigHolder.getInstance().recipes.legacyExtruderMolds) {
+            SHAPE_EXTRUDERS[21] = SHAPE_EXTRUDER_GEAR = REGISTRATE.item("gear_extruder_mold", Item::new)
+                    .lang("Extruder Mold (Gear)")
+                    .onRegister(
+                            materialInfo(
+                                    () -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
+                    .register();
+        }
+        if (ConfigHolder.getInstance().recipes.legacyExtruderMolds) {
+            SHAPE_EXTRUDERS[24] = SHAPE_EXTRUDER_GEAR_SMALL = REGISTRATE.item("small_gear_extruder_mold", Item::new)
+                    .lang("Extruder Mold (Small Gear)")
+                    .onRegister(
+                            materialInfo(
+                                    () -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
+                    .register();
+        }
+        if (ConfigHolder.getInstance().recipes.legacyExtruderMolds) {
+            SHAPE_EXTRUDERS[26] = SHAPE_EXTRUDER_ROTOR = REGISTRATE.item("rotor_extruder_mold", Item::new)
+                    .lang("Extruder Mold (Rotor)")
+                    .onRegister(
+                            materialInfo(
+                                    () -> new ItemMaterialInfo(new MaterialStack(GTMaterials.Steel, GTValues.M * 4))))
+                    .register();
+        }
         // Extruder Shapes index 13-20 (inclusive), id 44-51 (inclusive) are unused
         SHAPE_EXTRUDERS[22] = SHAPE_EXTRUDER_BOTTLE = REGISTRATE.item("bottle_extruder_mold", Item::new)
                 .lang("Extruder Mold (Bottle)")

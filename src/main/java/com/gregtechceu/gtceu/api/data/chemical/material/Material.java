@@ -10,10 +10,12 @@ import com.gregtechceu.gtceu.api.data.chemical.material.stack.DeferredMaterialSt
 import com.gregtechceu.gtceu.api.data.chemical.material.stack.MaterialStack;
 import com.gregtechceu.gtceu.api.data.tag.TagPrefix;
 import com.gregtechceu.gtceu.api.fluids.FluidBuilder;
+import com.gregtechceu.gtceu.api.fluids.FluidState;
 import com.gregtechceu.gtceu.api.fluids.store.FluidStorageKey;
 import com.gregtechceu.gtceu.api.fluids.store.FluidStorageKeys;
 import com.gregtechceu.gtceu.api.item.tool.MaterialToolTier;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
+import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.FormattingUtil;
 import com.gregtechceu.gtceu.utils.GTMath;
 import com.gregtechceu.gtceu.utils.TagUtil;
@@ -610,12 +612,32 @@ public final class Material {
     }
 
     /**
+     * The properties the config asks every Material to have. Done after material modification, so what addons and
+     * scripts add is counted, and before verification and fluid registration.
+     */
+    private void applyConfiguredProperties() {
+        var config = ConfigHolder.getInstance().materials;
+        if (config.allElementsHaveIngotsAndDusts && getElement() != null) {
+            properties.ensureSet(PropertyKey.DUST);
+            properties.ensureSet(PropertyKey.INGOT);
+        }
+        if (config.moltenFluidForAllIngots && properties.hasProperty(PropertyKey.INGOT)) {
+            var fluid = properties.ensureSet(PropertyKey.FLUID);
+            if (fluid.getQueuedBuilder(FluidStorageKeys.LIQUID) == null &&
+                    fluid.getQueuedBuilder(FluidStorageKeys.MOLTEN) == null) {
+                fluid.enqueueRegistration(FluidStorageKeys.LIQUID, new FluidBuilder().state(FluidState.LIQUID));
+            }
+        }
+    }
+
+    /**
      * Final verification is performed after material modification and
      * makes sure that properties and flags are verified,
      * and verifies material properties which are dependent on component materials.
      */
     @ApiStatus.Internal
     public void verifyMaterialFinal() {
+        applyConfiguredProperties();
         properties.verify();
         flags.verify(this);
 

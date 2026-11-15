@@ -164,7 +164,7 @@ public final class WireRecipeHandler {
 
         // Rubber Recipe (ULV-EV cables)
         if (voltageTier <= EV) {
-            GTRecipeBuilder builder = SPOOLING_RECIPES
+            GTRecipeBuilder builder = spooling()
                     .recipeBuilder("cover_" + material.getName() + "_" + prefix.name + "_rubber")
                     .EUt(VA[ULV]).duration(100)
                     .inputItems(prefix, material)
@@ -178,7 +178,7 @@ public final class WireRecipeHandler {
         }
 
         // Silicone Rubber Recipe (all cables)
-        GTRecipeBuilder builder = SPOOLING_RECIPES
+        GTRecipeBuilder builder = spooling()
                 .recipeBuilder("cover_" + material.getName() + "_" + prefix.name + "_silicone")
                 .EUt(VA[ULV]).duration(100)
                 .inputItems(prefix, material)
@@ -198,7 +198,7 @@ public final class WireRecipeHandler {
                 .save(provider);
 
         // Styrene Butadiene Rubber Recipe (all cables)
-        builder = SPOOLING_RECIPES
+        builder = spooling()
                 .recipeBuilder("cover_" + material.getName() + "_" + prefix.name + "_styrene_butadiene")
                 .EUt(VA[ULV]).duration(100)
                 .inputItems(prefix, material)

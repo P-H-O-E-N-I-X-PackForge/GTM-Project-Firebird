@@ -332,6 +332,12 @@ public class FluidRecipeCapability extends RecipeCapability<SizedFluidIngredient
     }
 
     // Maps fluids to a FluidEntryList for XEI: either a FluidTagList or a FluidStackList
+    @Override
+    public List<com.gregtechceu.gtceu.api.recipe.gui.ViewerEntry> toViewerEntries(Content content) {
+        return List.of(new com.gregtechceu.gtceu.api.recipe.gui.ViewerEntry(
+                mapIngredientToEntryList(of(content.content())), (float) content.chance() / content.maxChance()));
+    }
+
     public static FluidEntryList mapIngredientToEntryList(SizedFluidIngredient ingredient) {
         int amount;
         if (ingredient.ingredient() instanceof IRangedIngredient provider) {

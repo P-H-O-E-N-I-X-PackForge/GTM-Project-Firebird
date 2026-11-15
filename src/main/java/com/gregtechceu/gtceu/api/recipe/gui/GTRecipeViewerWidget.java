@@ -20,6 +20,8 @@ import net.neoforged.fml.loading.FMLLoader;
 import brachy.modularui.api.drawable.IDrawable;
 import brachy.modularui.api.drawable.Text;
 import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.screen.viewport.ModularGuiContext;
+import brachy.modularui.theme.WidgetThemeEntry;
 import brachy.modularui.utils.Alignment;
 import brachy.modularui.utils.MouseData;
 import brachy.modularui.value.DoubleValue;
@@ -27,16 +29,18 @@ import brachy.modularui.widget.ParentWidget;
 import brachy.modularui.widget.WidgetTree;
 import brachy.modularui.widgets.ButtonWidget;
 import brachy.modularui.widgets.layout.Flow;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import static com.gregtechceu.gtceu.api.GTValues.ULV;
 import static com.gregtechceu.gtceu.api.GTValues.V;
 
-public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
+public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> implements SizeAwareWidget {
 
     private final GTRecipe baseRecipe;
 
@@ -61,6 +65,9 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
 
     private final int minTier;
     private int tier;
+
+    private @Nullable BiConsumer<Integer, Integer> sizeListener;
+    private int lastWidth = -1, lastHeight = -1;
 
     public GTRecipeViewerWidget(GTRecipe recipe) {
         this.baseRecipe = recipe;
@@ -122,6 +129,40 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
             layoutFunc.createCapabilityUILayout(uiLayout, this, IO.OUT);
         }
         return row;
+    }
+
+    /**
+     * Called, with the new width and height, when the panel's size changes after it was first laid out, for example
+     * because a condition or a modifier added rows. The recipe viewer integrations use it to re-measure.
+     */
+    @Override
+    public void setSizeListener(@Nullable BiConsumer<Integer, Integer> listener) {
+        this.sizeListener = listener;
+    }
+
+    @Override
+    public void onUpdate() {
+        super.onUpdate();
+        checkSize();
+    }
+
+    /**
+     * EMI and JEI draw a recipe's screen without ticking it, so the size is also checked as it is drawn. A text row
+     * only gets its height once it has been drawn, so the first size the layout gives can be short.
+     */
+    @Override
+    public void draw(ModularGuiContext context, WidgetThemeEntry<?> widgetTheme) {
+        super.draw(context, widgetTheme);
+        checkSize();
+    }
+
+    private void checkSize() {
+        if (sizeListener == null) return;
+        var area = getPanel().getArea();
+        if (area.width == lastWidth && area.height == lastHeight) return;
+        lastWidth = area.width;
+        lastHeight = area.height;
+        sizeListener.accept(lastWidth, lastHeight);
     }
 
     public static String capabilityWidgetName(RecipeCapability<?> cap, IO io, int index) {

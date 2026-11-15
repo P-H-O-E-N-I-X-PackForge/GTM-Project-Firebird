@@ -16,6 +16,7 @@ import com.gregtechceu.gtceu.api.sync_system.annotations.RerenderOnChanged;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
 import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
+import com.gregtechceu.gtceu.common.mui.GTMuiSync;
 import com.gregtechceu.gtceu.common.mui.GTMuiWidgets;
 
 import net.minecraft.core.Direction;
@@ -332,7 +333,7 @@ public abstract class AbstractEnderLinkCover<T extends VirtualEntry> extends Cov
                 .child(new ButtonWidget<>().overlay(GTGuiTextures.BUTTON_CROSS).onMousePressed((context, button) -> {
                     MouseData mouseData = MouseData.create(button);
                     if (mouseData.mouseButton() == 1) {
-                        syncManager.callSyncedAction("deleteEntry",
+                        GTMuiSync.call(syncManager, "deleteEntry",
                                 buffer -> buffer.writeCharSequence(entry.getColorStr(), StandardCharsets.UTF_8));
                         return true;
                     }

@@ -778,9 +778,11 @@ public class RecipeAddition {
                 .inputItems(new ItemStack(Blocks.STONE))
                 .duration(20).EUt(VA[ULV]);
         for (var builder : new GTRecipeBuilder[] { cobblestone, stone }) {
-            builder.addData(LatheRecipeLogic.LUBRICATED_ROD,
-                    BuiltInRegistries.ITEM.getKey(ChemicalHelper.get(rod, Stone).getItem()).toString())
-                    .outputItems(rod, Stone)
+            if (ConfigHolder.INSTANCE.recipes.lubricatedLathe) {
+                builder.addData(LatheRecipeLogic.LUBRICATED_ROD,
+                        BuiltInRegistries.ITEM.getKey(ChemicalHelper.get(rod, Stone).getItem()).toString());
+            }
+            builder.outputItems(rod, Stone)
                     .outputItems(dustSmall, Stone, 2)
                     .save(provider);
         }

@@ -424,7 +424,7 @@ public class MultiblockControllerMachine extends MetaMachine {
         return structurePatterns.get(this.getDefinition(), name);
     }
 
-    protected final boolean forEachMultiPart(String name, Predicate<MultiblockPartMachine> action) {
+    protected boolean forEachMultiPart(String name, Predicate<MultiblockPartMachine> action) {
         var cache = patternStates.get(name).getCache();
         for (BlockInfo info : cache.values()) {
             if (info.getBlockEntity() instanceof MultiblockPartMachine part) {

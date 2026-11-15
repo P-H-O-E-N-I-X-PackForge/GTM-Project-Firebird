@@ -343,6 +343,12 @@ public class ItemRecipeCapability extends RecipeCapability<SizedIngredient> {
         return invs;
     }
 
+    @Override
+    public List<com.gregtechceu.gtceu.api.recipe.gui.ViewerEntry> toViewerEntries(Content content) {
+        return List.of(new com.gregtechceu.gtceu.api.recipe.gui.ViewerEntry(
+                mapIngredientToEntryList(of(content.content())), (float) content.chance() / content.maxChance()));
+    }
+
     // Maps ingredients to an ItemEntryList for XEI: either an ItemTagList or an ItemStackList
     public static ItemEntryList mapIngredientToEntryList(final SizedIngredient ingredient) {
         if (ingredient.getContainedCustom() instanceof IntProviderIngredient intProvider) {

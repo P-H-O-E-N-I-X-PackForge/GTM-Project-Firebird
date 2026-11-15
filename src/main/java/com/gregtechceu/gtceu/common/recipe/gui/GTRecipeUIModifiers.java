@@ -28,7 +28,9 @@ public class GTRecipeUIModifiers {
             widget.textComponents.child(new TextWidget<>(
                     Text.lang("gtceu.recipe.temperature", FormattingUtil.formatTemperature(temp))));
 
-            Flow coilRow = Flow.row().coverChildrenHeight();
+            // a fixed one-line height: the coil icon is taller than the text, and covering it left an empty gap above
+            // the line, so the icon is lifted to overlap the line instead
+            Flow coilRow = Flow.row().height(10);
 
             ICoilType requiredCoil = ICoilType.getMinRequiredType(temp);
 
@@ -46,6 +48,7 @@ public class GTRecipeUIModifiers {
                     .recipeSlotRole(RecipeSlotRole.RENDER_ONLY)
                     .value(ItemStackList.of(items))
                     .background(IDrawable.EMPTY)
+                    .top(-4)
                     .right(20));
 
             widget.textComponents.child(coilRow);

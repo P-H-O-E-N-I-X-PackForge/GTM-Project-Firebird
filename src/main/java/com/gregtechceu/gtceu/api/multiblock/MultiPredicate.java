@@ -93,7 +93,7 @@ public abstract class MultiPredicate implements SettingsHolder<MultiPredicate> {
 
     /// Called after all blocks are iterated <br/>
     /// Usually used for testing the global min of predicates
-    public final boolean postGlobalTest(PredicateContext ctx) {
+    public boolean postGlobalTest(PredicateContext ctx) {
         ctx.setStage(PredicateContext.PredicateStage.GLOBAL_MIN);
         if (testGlobalMin(ctx)) return true;
         for (Component content : getDescriptiveContents()) {
@@ -106,7 +106,7 @@ public abstract class MultiPredicate implements SettingsHolder<MultiPredicate> {
 
     /// Called after iterating all blocks in a given slice <br/>
     /// Usually used for testing the slice min of predicates
-    public final boolean postSliceTest(PredicateContext ctx) {
+    public boolean postSliceTest(PredicateContext ctx) {
         ctx.setStage(PredicateContext.PredicateStage.SLICE_MIN);
         if (testSliceMin(ctx)) return true;
         for (Component content : getDescriptiveContents()) {

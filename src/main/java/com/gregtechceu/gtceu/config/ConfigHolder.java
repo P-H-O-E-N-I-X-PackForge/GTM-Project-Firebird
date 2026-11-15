@@ -40,6 +40,9 @@ public class ConfigHolder {
     @Configurable
     public RecipeConfigs recipes = new RecipeConfigs();
     @Configurable
+    @Configurable.Comment("Config options for the Materials GT generates")
+    public MaterialConfigs materials = new MaterialConfigs();
+    @Configurable
     public WorldGenConfigs worldgen = new WorldGenConfigs();
     @Configurable
     public MachineConfigs machines = new MachineConfigs();
@@ -58,6 +61,28 @@ public class ConfigHolder {
     public DeveloperConfigs dev = new DeveloperConfigs();
 
     public static class RecipeConfigs {
+
+        @Configurable
+        @Configurable.Comment({
+                "Whether cable insulation and the coil recipes use the Spooler. Turn this off to make them in the",
+                "Assembler instead, as before the Spooler existed. The Spooler machines stay, but have no recipes.",
+                "Default: true" })
+        @Configurable.UpdateRestriction(UpdateRestrictions.MAIN_MENU)
+        public boolean useSpooler = true; // default true
+        @Configurable
+        @Configurable.Comment({
+                "Whether the Lathe can use Lubricant to make 2 Rods from an Ingot, instead of 1 Rod and 2 Small Piles of",
+                "Dust. Turn this off for the plain Lathe recipe only.", "Default: true" })
+        @Configurable.UpdateRestriction(UpdateRestrictions.MAIN_MENU)
+        public boolean lubricatedLathe = true; // default true
+        @Configurable
+        @Configurable.Comment({
+                "Bring back the Extruder Molds for Rods, Bolts, Gears, Small Gears and Rotors, with the Extruder",
+                "recipes that used them, and the older Extruder Mold crafting recipes. Off, those are made with the",
+                "Lathe and the Forming Press as now. Combine with lubricatedLathe = false for the full old behaviour.",
+                "Default: false" })
+        @Configurable.UpdateRestriction(UpdateRestrictions.GAME_RESTART)
+        public boolean legacyExtruderMolds = false; // default false
 
         @Configurable
         @Configurable.Comment({ "Whether to generate Flawed and Chipped Gems for materials and recipes involving them.",
@@ -183,6 +208,22 @@ public class ConfigHolder {
                 "Default: 1.0f" })
         @Configurable.DecimalRange(min = 0.0f, max = 1.0f)
         public float extractorRecyclingYield = 1.0f;
+    }
+
+    public static class MaterialConfigs {
+
+        @Configurable
+        @Configurable.Comment({
+                "Give every element Material a Dust and an Ingot, including the gases, so each can be made into items.",
+                "Default: false" })
+        @Configurable.UpdateRestriction(UpdateRestrictions.GAME_RESTART)
+        public boolean allElementsHaveIngotsAndDusts = false; // default false
+        @Configurable
+        @Configurable.Comment({
+                "Give every Material that has an Ingot a molten Fluid, if it does not have a liquid already.",
+                "Default: false" })
+        @Configurable.UpdateRestriction(UpdateRestrictions.GAME_RESTART)
+        public boolean moltenFluidForAllIngots = false; // default false
     }
 
     public static class CompatibilityConfigs {

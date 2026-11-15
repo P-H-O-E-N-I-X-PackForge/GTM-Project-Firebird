@@ -19,6 +19,7 @@ import com.gregtechceu.gtceu.common.data.GTMachines;
 import com.gregtechceu.gtceu.common.data.machines.GTMultiMachines;
 import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.config.ConfigHolder;
+import com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewExtensions.Slot;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -69,6 +70,7 @@ import java.util.*;
 @Accessors(chain = true)
 public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidget> {
 
+    @Getter
     private final MultiblockMachineDefinition multiblockDefinition;
 
     // schema stuff
@@ -97,6 +99,8 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     @Setter
     private @Nullable BlockPos controllerPos;
     private SelectionInfo selectionInfo = SelectionInfo.empty();
+    @Getter
+    private boolean terminal;
 
     private int yLevel = Integer.MAX_VALUE;
 
@@ -110,6 +114,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     public MultiblockPreviewWidget(MultiblockMachineDefinition definition, MultiblockSchemaInfo schemaInfo, int width,
                                    int height, boolean terminal) {
         this.multiblockDefinition = definition;
+        this.terminal = terminal;
         if (!GTCEu.isClientThread()) return;
         this.frontFacing = definition.getRotationState().defaultDirection;
         this.upFacing = switch (definition.getRotationState()) {
@@ -306,6 +311,12 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             notifyWidgetHandlers();
                             return true;
                         }))
+                .childIf(MultiblockPreviewExtensions.has(Slot.TOOLBAR, definition), () -> Flow.row()
+                        .name("toolbar_extensions")
+                        .left(64)
+                        .coverChildren()
+                        .childPadding(1)
+                        .children(MultiblockPreviewExtensions.build(Slot.TOOLBAR, this), w -> w))
                 .child(Flow.col()
                         .name("main")
                         .coverChildren()
@@ -340,17 +351,25 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                                         .name("selected_block")
                                         .coverChildren(20)
                                         .clientOnlyHandler(this.selectedBlockHandler))
+                                .childIf(MultiblockPreviewExtensions.has(Slot.LEFT, definition),
+                                        () -> extensionColumn(Slot.LEFT))
                                 .child(new ParentWidget<>()
                                         .coverChildren()
                                         .background(GTGuiTextures.BACKGROUND_INVERSE)
                                         .padding(3)
-                                        .child(schema))
+                                        .child(schema)
+                                        .childIf(MultiblockPreviewExtensions.has(Slot.OVERLAY, definition),
+                                                () -> extensionOverlay()))
                                 .child(new DynamicWidget<>()
                                         .background(GTGuiTextures.BACKGROUND)
                                         .coverChildrenWidth()
                                         .heightRel(1f)
                                         .name("parts_view")
-                                        .clientOnlyHandler(partsHandler))))
+                                        .clientOnlyHandler(partsHandler))
+                                .childIf(MultiblockPreviewExtensions.has(Slot.RIGHT, definition),
+                                        () -> extensionColumn(Slot.RIGHT)))
+                        .childIf(MultiblockPreviewExtensions.has(Slot.BELOW, definition),
+                                () -> extensionColumn(Slot.BELOW)))
                 .childIf(terminal, () -> new ButtonWidget<>()
                         .right(5)
                         .overlay(new DrawableStack(new ItemDrawable(GTMultiMachines.ELECTRIC_BLAST_FURNACE.asStack()),
@@ -539,6 +558,33 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     public void refreshSchema() {
         this.multiblockSchemaInfo.refreshSchema(multiblockDefinition, frontFacing, upFacing, isFlipped,
                 onSchemaRefresh);
+        MultiblockPreviewExtensions.fireSchemaChanged(this);
+    }
+
+    private Flow extensionColumn(Slot slot) {
+        return Flow.col().name("extensions_" + slot.name().toLowerCase())
+                .coverChildren().childPadding(2)
+                .crossAxisAlignment(Alignment.CrossAxis.START)
+                .children(MultiblockPreviewExtensions.build(slot, this), w -> w);
+    }
+
+    private ParentWidget<?> extensionOverlay() {
+        // tiny, so it never takes the mouse from the 3D view; the widgets inside place themselves
+        ParentWidget<?> overlay = new ParentWidget<>().name("extensions_overlay").size(1, 1);
+        MultiblockPreviewExtensions.build(Slot.OVERLAY, this).forEach(overlay::child);
+        return overlay;
+    }
+
+    /** The blocks a preview of the multiblock would list, without building the preview itself. */
+    public static Reference2IntMap<Block> previewBlockCounts(MultiblockMachineDefinition definition) {
+        var info = new MultiblockSchemaInfo(definition);
+        Direction front = definition.getRotationState().defaultDirection;
+        Direction up = switch (definition.getRotationState()) {
+            case Y_AXIS -> Direction.NORTH;
+            case ALL, NON_Y_AXIS, NONE -> Direction.UP;
+        };
+        info.refreshSchema(definition, front, up, false, null);
+        return info.getBlockCounts();
     }
 
     private void notifyWidgetHandlers() {
