@@ -256,6 +256,16 @@ public class GregTechKubeJSPlugin implements KubeJSPlugin {
         event.add("GTFluidStorageKeys", FluidStorageKeys.class);
         event.add("GTFluidState", FluidState.class);
         event.add("GTMaterialIconSet", MaterialIconSet.class);
+        event.add("GTViewerVisibility", com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerVisibility.class);
+        if (GTCEu.isClientSide()) {
+            // the page and preview widgets are client side classes
+            event.add("GTViewerPages", com.gregtechceu.gtceu.integration.kjs.viewer.GTViewerPages.class);
+            event.add("GTViewerWidgets", com.gregtechceu.gtceu.integration.kjs.viewer.GTViewerWidgets.class);
+            event.add("GTPreviewExtensions",
+                    com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewExtensions.class);
+            event.add("GTPreviewSlot",
+                    com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewExtensions.Slot.class);
+        }
         event.add("GTMaterialIconType", MaterialIconType.class);
         event.add("ChemicalHelper", ChemicalHelper.class);
         event.add("PropertyKey", PropertyKey.class);

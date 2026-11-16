@@ -67,6 +67,14 @@ public class AutobuildHelper {
     public static void autobuild(ServerPlayer player, ItemStack item, MultiblockMachineDefinition definition,
                                  MultiblockControllerMachine controller, Map<BlockPos, BlockInfo> blocksToPlace,
                                  AbstractStructureHelper structureHelper, boolean isFlipped) {
+        autobuild(player, item, definition, controller, blocksToPlace, structureHelper, isFlipped,
+                DEFAULT_STRUCTURE);
+    }
+
+    /** Builds the structure named {@code structure} of the multiblock. */
+    public static void autobuild(ServerPlayer player, ItemStack item, MultiblockMachineDefinition definition,
+                                 MultiblockControllerMachine controller, Map<BlockPos, BlockInfo> blocksToPlace,
+                                 AbstractStructureHelper structureHelper, boolean isFlipped, String structure) {
         Long2ObjectOpenHashMap<BlockState> alreadyValidPlaced = new Long2ObjectOpenHashMap<>();
         Long2ObjectOpenHashMap<BlockState> replaceableBlocks = new Long2ObjectOpenHashMap<>();
         Long2ObjectOpenHashMap<BlockState> canNotPlaceBlocks = new Long2ObjectOpenHashMap<>();
@@ -91,13 +99,18 @@ public class AutobuildHelper {
             BlockPos pos = entry.getKey().offset(controllerOffset);
             var blockState = level.getBlockState(pos);
 
-            var predicate = structureHelper.getPredicateFromPos(
-                    definition.getStructurePatterns().get(DEFAULT_STRUCTURE).get(),
-                    entry.getKey(), controller.getFrontFacing(), controller.getUpwardsFacing(), isFlipped);
-
-            cxt.updatePos(pos);
-            var innerPredicate = predicate.getPredicateAtPos(cxt);
-            if (innerPredicate.hasMatched()) {
+            boolean matched;
+            try {
+                var predicate = structureHelper.getPredicateFromPos(
+                        definition.getStructurePatterns().get(structure).get(),
+                        entry.getKey(), controller.getFrontFacing(), controller.getUpwardsFacing(), isFlipped);
+                cxt.updatePos(pos);
+                matched = predicate.getPredicateAtPos(cxt).hasMatched();
+            } catch (RuntimeException e) {
+                // a block of an overlaid structure, which the main pattern knows nothing about
+                matched = blockState == entry.getValue().getBlockState();
+            }
+            if (matched) {
                 alreadyValidPlaced.put(pos.asLong(), blockState);
             } else {
                 if (blockState.canBeReplaced()) {

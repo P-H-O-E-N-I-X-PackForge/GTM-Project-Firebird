@@ -63,8 +63,41 @@ public abstract class RecipeCondition<T extends RecipeCondition<T>> {
 
     public abstract Component getTooltips();
 
+    /**
+     * A short label for the condition on recipe pages, shown as a tinted pill under the inputs instead of a line of
+     * text, where the viewer can show one. Its tooltip is the longer text.
+     *
+     * @param text    the label, for example "sculk"
+     * @param color   the tint, as ARGB
+     * @param tooltip shown when the pill is hovered
+     */
+    public record ViewerPill(String text, int color, java.util.List<Component> tooltip) {}
+
+    /** The pill this condition shows on recipe pages, or null to show {@link #getTooltips()} as a line of text. */
+    public @org.jetbrains.annotations.Nullable ViewerPill viewerPill() {
+        return null;
+    }
+
+    /**
+     * Whether the recipe viewers leave the recipe out, for conditions that decide who a recipe is for. Asked on the
+     * client whenever the viewers list recipes, so it may read the client's own state; tell the viewers with
+     * {@code GTViewerVisibility.refresh()} when that state changes.
+     */
+    public boolean hiddenInViewer(@NotNull GTRecipe recipe) {
+        return false;
+    }
+
     public RecipeUIModifier modifyUI() {
-        return RecipeUIModifier.textLine(Text.of(getTooltips()));
+        var textLine = RecipeUIModifier.textLine(Text.of(getTooltips()));
+        ViewerPill pill = viewerPill();
+        if (pill == null) return textLine;
+        return (recipe, widget) -> {
+            if (com.gregtechceu.gtceu.GTCEu.Mods.isEMILoaded()) {
+                com.gregtechceu.gtceu.integration.recipeviewer.emi.GTEmiPills.add(widget, pill);
+            } else {
+                textLine.buildRecipeUI(recipe, widget);
+            }
+        };
     }
 
     public boolean check(@NotNull GTRecipe recipe, @NotNull RecipeLogic recipeLogic) {

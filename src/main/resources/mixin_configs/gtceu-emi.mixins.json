@@ -11,7 +11,9 @@
     "client": [],
     "mixins": [
         "emi.FillRecipePacketMixin",
-        "emi.FluidEmiStackMixin"
+        "emi.FluidEmiStackMixin",
+        "emi.RecipeDisplayMixin",
+        "emi.RecipeScreenMixin"
     ],
     "injectors": {
         "defaultRequire": 1,

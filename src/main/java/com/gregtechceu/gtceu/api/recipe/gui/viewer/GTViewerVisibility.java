@@ -37,6 +37,11 @@ public final class GTViewerVisibility {
     }
 
     public static boolean isVisible(ResourceLocation category, ResourceLocation recipe, Object entry) {
+        if (entry instanceof com.gregtechceu.gtceu.api.recipe.GTRecipe gtRecipe) {
+            for (var condition : gtRecipe.conditions) {
+                if (condition.hiddenInViewer(gtRecipe)) return false;
+            }
+        }
         for (Rule rule : RULES) {
             if (!rule.visible(category, recipe, entry)) return false;
         }

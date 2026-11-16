@@ -225,6 +225,37 @@ public class GTMuiWidgets {
                 GTGuiTextures.BUTTON_BATCH[0], GTGuiTextures.BUTTON_BATCH[1], "gtceu.machine.batching");
     }
 
+    /**
+     * The item auto-output button with the side menu: click turns auto-output on or off, shift-click opens a menu to
+     * choose the side it outputs to.
+     */
+    public static ToggleButton createAutoOutputItemButton(AutoOutputTrait autoOutput, PanelSyncManager syncManager) {
+        return createAutoOutputSideButton(autoOutput, false, syncManager, autoOutput::isAutoOutputItems,
+                autoOutput::setAllowAutoOutputItems, GTGuiTextures.BUTTON_ITEM_OUTPUT, "gtceu.gui.item_auto_output");
+    }
+
+    /** The fluid auto-output button with the side menu, see the item one. */
+    public static ToggleButton createAutoOutputFluidButton(AutoOutputTrait autoOutput, PanelSyncManager syncManager) {
+        return createAutoOutputSideButton(autoOutput, true, syncManager, autoOutput::isAutoOutputFluids,
+                autoOutput::setAllowAutoOutputFluids, GTGuiTextures.BUTTON_FLUID_OUTPUT,
+                "gtceu.gui.fluid_auto_output");
+    }
+
+    private static ToggleButton createAutoOutputSideButton(AutoOutputTrait autoOutput, boolean fluid,
+                                                           PanelSyncManager syncManager, BooleanSupplier getter,
+                                                           BooleanConsumer setter, UITexture texture, String langKey) {
+        var value = new BooleanSyncValue(getter, setter).allowC2S();
+        var side = AutoOutputSideMenu.sideValue(autoOutput, fluid, syncManager);
+        return new AutoOutputSideMenu.Button(() -> AutoOutputSideMenu.buildMenu(autoOutput, side))
+                .value(value)
+                .overlay(texture)
+                .tooltipAutoUpdate(true)
+                .tooltipBuilder(r -> {
+                    r.addLine(Text.lang(langKey + (value.getBoolValue() ? ".enabled" : ".disabled")));
+                    r.addLine(Text.lang("gtceu.gui.output_side.hint"));
+                });
+    }
+
     public static ToggleButton createAutoOutputItemButton(AutoOutputTrait autoOutput) {
         return createToggleButton(autoOutput::isAutoOutputItems, autoOutput::setAllowAutoOutputItems,
                 GTGuiTextures.BUTTON_ITEM_OUTPUT, "gtceu.gui.item_auto_output");

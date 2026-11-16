@@ -108,12 +108,16 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MEPatternBufferPartMachine extends MEBusPartMachine
                                         implements ICraftingProvider, PatternContainer, IDataStickInteractable {
 
+    /** How many patterns a buffer holds unless a subclass asks for another amount. */
     protected static final int MAX_PATTERN_COUNT = 27;
+    /** How many pattern slots, and so how many workers, this buffer has. */
+    @Getter
+    protected final int patternCount;
     private final InternalInventory internalPatternInventory = new InternalInventory() {
 
         @Override
         public int size() {
-            return MAX_PATTERN_COUNT;
+            return patternInventory.getSlots();
         }
 
         @Override
@@ -134,7 +138,7 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
     @SyncToClient
     // Maybe an Expansion Option in the future? a bit redundant for rn. Maybe Packdevs want to add their own
     // version.
-    private final CustomItemStackHandler patternInventory = new CustomItemStackHandler(MAX_PATTERN_COUNT);
+    private final CustomItemStackHandler patternInventory;
 
     @Getter
     @SaveField
@@ -145,9 +149,9 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
     protected final NotifiableFluidTank shareTank;
 
     @SaveField
-    protected final InternalSlot[] internalInventory = new InternalSlot[MAX_PATTERN_COUNT];
+    protected final InternalSlot[] internalInventory;
 
-    private final @Nullable IPatternDetails[] patternSlotDetails = new IPatternDetails[MAX_PATTERN_COUNT];
+    private final @Nullable IPatternDetails[] patternSlotDetails;
 
     @SyncToClient
     @SaveField
@@ -173,7 +177,19 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
     private final List<RecipeHandlerList> bufferHandlers;
 
     public MEPatternBufferPartMachine(BlockEntityCreationInfo info) {
+        this(info, MAX_PATTERN_COUNT);
+    }
+
+    /**
+     * For buffers with another number of pattern slots than the usual one. Each slot gets a worker, so the number of
+     * proxies a buffer can serve grows with it.
+     */
+    protected MEPatternBufferPartMachine(BlockEntityCreationInfo info, int patternCount) {
         super(info, IO.IN, new NotifiableItemStackHandler(9, IO.IN, IO.NONE));
+        this.patternCount = patternCount;
+        this.patternInventory = new CustomItemStackHandler(patternCount);
+        this.internalInventory = new InternalSlot[patternCount];
+        this.patternSlotDetails = new IPatternDetails[patternCount];
         patternInventory.setOnContentsChanged(() -> getSyncDataHolder().markClientSyncFieldDirty("patternInventory"));
         this.patternInventory.setFilter(stack -> stack.getItem() instanceof EncodedPatternItem<?>);
         for (int i = 0; i < this.internalInventory.length; i++) {
@@ -207,7 +223,7 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
     }
 
     private void syncWorkerCount() {
-        int target = Mth.clamp(proxies.size() + 1, 1, MAX_PATTERN_COUNT);
+        int target = Mth.clamp(proxies.size() + 1, 1, patternCount);
         while (workers.size() < target) {
             addWorker();
         }
@@ -218,7 +234,7 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
 
     private void addWorker() {
         int idx = workers.size();
-        if (idx >= MAX_PATTERN_COUNT) {
+        if (idx >= patternCount) {
             return;
         }
         InternalSlot slot = internalInventory[idx];
@@ -239,6 +255,34 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
     private void onSlotChanged() {
         aggregateItemHandler.notifyListeners();
         aggregateFluidHandler.notifyListeners();
+    }
+
+    /**
+     * Whether the proxy may run its recipe on the pattern in this slot. Asked once the slot's contents fit the recipe;
+     * a slot that is turned down is left for another proxy or recipe. Subclasses can share the slots between their
+     * proxies this way.
+     *
+     * @param requester the proxy the recipe is being handled for, or null when the buffer is used directly
+     */
+    protected boolean mayUseSlot(int slotIndex, @Nullable MEPatternBufferProxyPartMachine requester) {
+        return true;
+    }
+
+    /** Called when a proxy's recipe fits this slot's contents and the proxy may use the slot. */
+    protected void onSlotWanted(int slotIndex, @Nullable MEPatternBufferProxyPartMachine requester) {}
+
+    /** The positions of the proxies attached to this buffer. */
+    public Set<BlockPos> getProxyPositions() {
+        return java.util.Collections.unmodifiableSet(proxies);
+    }
+
+    /** Runs a recipe on behalf of a proxy, or of the buffer itself when {@code requester} is null. */
+    public Map<RecipeCapability<?>, List<Object>> handleBufferRecipe(@Nullable MEPatternBufferProxyPartMachine requester,
+                                                                     IO io, GTRecipe recipe,
+                                                                     Map<RecipeCapability<?>, List<Object>> contents,
+                                                                     boolean simulate) {
+        return ((BufferRecipeHandlerList) bufferRecipeHandler).handleRecipeFor(requester, io, recipe, contents,
+                simulate);
     }
 
     static boolean couldSlotMatchContents(InternalSlot slot, Map<RecipeCapability<?>, List<Object>> contents) {
@@ -460,11 +504,19 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
         public Map<RecipeCapability<?>, List<Object>> handleRecipe(IO io, GTRecipe recipe,
                                                                    Map<RecipeCapability<?>, List<Object>> contents,
                                                                    boolean simulate) {
+            return handleRecipeFor(null, io, recipe, contents, simulate);
+        }
+
+        Map<RecipeCapability<?>, List<Object>> handleRecipeFor(@Nullable MEPatternBufferProxyPartMachine requester,
+                                                               IO io, GTRecipe recipe,
+                                                               Map<RecipeCapability<?>, List<Object>> contents,
+                                                               boolean simulate) {
             if (io != IO.IN || contents.isEmpty()) {
                 return contents;
             }
 
-            for (Worker worker : workers) {
+            for (int index = 0; index < workers.size(); index++) {
+                Worker worker = workers.get(index);
                 InternalSlot slot = worker.slot;
                 if (slot.isItemEmpty() && slot.isFluidEmpty()) {
                     continue;
@@ -472,6 +524,10 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                 if (!couldSlotMatchContents(slot, contents)) {
                     continue;
                 }
+                if (!mayUseSlot(index, requester)) {
+                    continue;
+                }
+                onSlotWanted(index, requester);
 
                 Map<RecipeCapability<?>, List<Object>> left = consumeWorker(worker, io, recipe, contents, true);
                 if (!left.isEmpty()) {
@@ -760,11 +816,11 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                 .asWidget().marginTop(2).marginBottom(4));
 
         flow.child(new Grid()
-                .height(18 * (MAX_PATTERN_COUNT / 9))
+                .height(18 * (patternCount / 9))
                 .minElementMargin(0, 0)
                 .minColWidth(18).minRowHeight(18)
                 .leftRel(0.5f)
-                .gridOfSizeWidth(MAX_PATTERN_COUNT, 9, (x, y, index) -> new ItemSlot()
+                .gridOfSizeWidth(patternCount, 9, (x, y, index) -> new ItemSlot()
                         .slot(SyncHandlers.itemSlot(patternInventory, index)
                                 .slotGroup(patternSlotGroup)
                                 .accessibility(true, true)
@@ -781,7 +837,7 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
 
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
-        ArrayList<IPatternDetails> result = new ArrayList<>(MAX_PATTERN_COUNT);
+        ArrayList<IPatternDetails> result = new ArrayList<>(patternCount);
         for (IPatternDetails p : patternSlotDetails) {
             if (p != null) result.add(p);
         }

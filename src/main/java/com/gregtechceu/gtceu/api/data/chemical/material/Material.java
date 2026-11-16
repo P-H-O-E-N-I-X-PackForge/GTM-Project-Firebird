@@ -537,6 +537,48 @@ public final class Material {
         properties.setProperty(key, property);
     }
 
+    /**
+     * Sets a property, replacing the one this material already has for the key. Unlike
+     * {@link #setProperty}, which only adds, this is the way to swap a property for another, for example a new
+     * {@code ToolProperty}.
+     */
+    public <T extends IMaterialProperty> void replaceProperty(PropertyKey<T> key, T property) {
+        if (GTRegistries.MATERIALS.isFrozen()) {
+            throw new IllegalStateException("Cannot change the properties of a Material when registry is frozen!");
+        }
+        properties.replaceProperty(key, property);
+    }
+
+    /**
+     * Changes the property in place, adding a default one first if the material has none:
+     * {@code material.modifyProperty(PropertyKey.TOOL, tool -> tool.setDurability(2000))}.
+     */
+    public <T extends IMaterialProperty> T modifyProperty(PropertyKey<T> key, java.util.function.Consumer<T> modifier) {
+        if (GTRegistries.MATERIALS.isFrozen()) {
+            throw new IllegalStateException("Cannot change the properties of a Material when registry is frozen!");
+        }
+        return properties.modifyProperty(key, modifier);
+    }
+
+    /**
+     * Changes how one of this material's fluids will be built, for example its textures or colour:
+     * {@code Iron.modifyFluid(FluidStorageKeys.LIQUID, fluid -> fluid.iconSet(MyIconSets.EMBER))}. Only works while
+     * materials can still be modified, before their fluids are registered.
+     *
+     * @throws IllegalArgumentException if the material has no such fluid
+     */
+    public void modifyFluid(FluidStorageKey key, java.util.function.Consumer<FluidBuilder> modifier) {
+        if (GTRegistries.MATERIALS.isFrozen()) {
+            throw new IllegalStateException("Cannot change the fluids of a Material when registry is frozen!");
+        }
+        var property = getProperty(PropertyKey.FLUID);
+        FluidBuilder builder = property == null ? null : property.getQueuedBuilder(key);
+        if (builder == null) {
+            throw new IllegalArgumentException("Material " + this + " has no " + key + " fluid to change");
+        }
+        modifier.accept(builder);
+    }
+
     public boolean isSolid() {
         return hasProperty(PropertyKey.INGOT) || hasProperty(PropertyKey.GEM);
     }

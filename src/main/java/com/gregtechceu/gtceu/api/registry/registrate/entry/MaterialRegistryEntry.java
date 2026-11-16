@@ -116,6 +116,23 @@ public class MaterialRegistryEntry extends RegistryEntry<Material, Material> {
         value().setProperty(key, property);
     }
 
+    /** @see Material#replaceProperty */
+    public <T extends IMaterialProperty> void replaceProperty(PropertyKey<T> key, T property) {
+        value().replaceProperty(key, property);
+    }
+
+    /** @see Material#modifyProperty */
+    public <T extends IMaterialProperty> T modifyProperty(PropertyKey<T> key,
+                                                          java.util.function.Consumer<T> modifier) {
+        return value().modifyProperty(key, modifier);
+    }
+
+    /** @see Material#modifyFluid */
+    public void modifyFluid(FluidStorageKey key,
+                            java.util.function.Consumer<com.gregtechceu.gtceu.api.fluids.FluidBuilder> modifier) {
+        value().modifyFluid(key, modifier);
+    }
+
     public boolean isSolid() {
         return hasProperty(PropertyKey.INGOT) || hasProperty(PropertyKey.GEM);
     }

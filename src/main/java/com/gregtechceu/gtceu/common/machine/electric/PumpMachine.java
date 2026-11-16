@@ -559,7 +559,7 @@ public class PumpMachine extends TieredEnergyMachine implements IMuiMachine {
                         .child(Flow.row()
                                 .margin(4, 0, 41, 0)
                                 .coverChildren()
-                                .child(GTMuiWidgets.createAutoOutputFluidButton(autoOutput)))
+                                .child(GTMuiWidgets.createAutoOutputFluidButton(autoOutput, syncManager)))
                         .child(Flow.column()
                                 .margin(68, 0, 23, 0)
                                 .coverChildren()

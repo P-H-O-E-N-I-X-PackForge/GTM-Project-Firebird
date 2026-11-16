@@ -3,6 +3,7 @@ package com.gregtechceu.gtceu.api.machine.multiblock;
 import com.gregtechceu.gtceu.api.block.MetaMachineBlock;
 import com.gregtechceu.gtceu.api.block.property.GTBlockStateProperties;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
+import com.gregtechceu.gtceu.api.events.MultiblockFormEvent;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
@@ -26,6 +27,7 @@ import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
 
+import net.neoforged.neoforge.common.NeoForge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.TickTask;
@@ -288,6 +290,17 @@ public class MultiblockControllerMachine extends MetaMachine {
     }
 
     public void formStructure(String substructureName) {
+        if (getLevel() instanceof ServerLevel serverLevel) {
+            var event = NeoForge.EVENT_BUS.post(new MultiblockFormEvent(this, substructureName));
+            if (event.isCanceled()) {
+                if (event.getReason() != null) {
+                    var near = serverLevel.getNearestPlayer(getBlockPos().getX() + 0.5, getBlockPos().getY() + 0.5,
+                            getBlockPos().getZ() + 0.5, 64, p -> !p.isSpectator());
+                    if (near != null) near.sendSystemMessage(event.getReason());
+                }
+                return;
+            }
+        }
         var patternState = getPatternState(substructureName);
         patternState.setFormed(true);
         if (substructureName.equals(DEFAULT_STRUCTURE)) {

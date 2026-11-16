@@ -25,6 +25,7 @@ import brachy.modularui.screen.ModularPanel;
 import brachy.modularui.screen.SecondaryPanel;
 import brachy.modularui.screen.viewport.ModularGuiContext;
 import brachy.modularui.theme.WidgetThemeEntry;
+import brachy.modularui.utils.sides.SidedAccessHelper;
 import brachy.modularui.value.StringValue;
 import brachy.modularui.value.sync.PanelSyncManager;
 import brachy.modularui.widget.Widget;
@@ -33,7 +34,10 @@ import brachy.modularui.widgets.layout.Flow;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.emi.emi.api.stack.EmiStack;
+import io.netty.buffer.Unpooled;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 public class AEConfigWidget extends Widget<AEConfigWidget>
                             implements Interactable, GhostIngredientSlot<ItemStack> {
@@ -257,7 +261,8 @@ public class AEConfigWidget extends Widget<AEConfigWidget>
                 return Result.SUCCESS;
             } else if (button == 0) {
                 GenericStack config = configSyncHandler != null ? configSyncHandler.getClientConfig(slotIndex) : null;
-                boolean holdingItem = !Minecraft.getInstance().player.containerMenu.getCarried().isEmpty();
+                boolean holdingItem = !Objects.requireNonNull(Minecraft.getInstance().player).containerMenu.getCarried()
+                        .isEmpty();
                 if (config != null && !holdingItem) {
                     openAmountEditor(slotIndex);
                 } else {

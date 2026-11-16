@@ -74,16 +74,19 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
             return InteractionResult.PASS;
         }
 
-        var info = stack.get(GTDataComponents.TERMINAL_CONTROLLER_INFO);
-        if (info == null) return InteractionResult.PASS;
+        // Sneak-clicking a controller builds it. If the terminal already holds this multiblock's information, from a
+        // right click on the controller, its block choices and flip are used. Otherwise the multiblock is built as it
+        // is, with the default blocks, and the terminal is left as it was.
+        var stored = stack.get(GTDataComponents.TERMINAL_CONTROLLER_INFO);
+        boolean useStored = stored != null && controller.getDefinition() == stored.definition();
+        var info = useStored ? stored : new ControllerInfo(controller);
 
-        if (controller.getDefinition() != info.definition()) {
-            // TODO: Log errors in chat
-            return InteractionResult.PASS;
-        }
-
-        PatternState state = controller.getDefaultPatternState();
-        if (state.isFormed()) {
+        MultiblockSchemaInfo chosen = useStored ?
+                stack.getOrDefault(GTDataComponents.MULTI_SCHEMA_INFO, defaultSchemaInfo(info)) :
+                defaultSchemaInfo(info);
+        String structure = chosen.getStructure();
+        PatternState state = controller.getPatternState(structure);
+        if (state == null || state.isFormed()) {
             return InteractionResult.PASS;
         }
 
@@ -91,8 +94,7 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
         Direction upFacing = controller.getUpwardsFacing();
 
         if (!level.isClientSide) {
-            MultiblockSchemaInfo schemaInfo = stack.getOrDefault(GTDataComponents.MULTI_SCHEMA_INFO,
-                    defaultSchemaInfo(info));
+            MultiblockSchemaInfo schemaInfo = chosen;
             boolean flipped = schemaInfo.isFlipped();
 
             ServerPlayer serverPlayer = (ServerPlayer) player;
@@ -100,7 +102,7 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
             // TODO: Probably extract into helper function
             Map<BlockPos, BlockInfo> resultStructure = new HashMap<>();
             AbstractStructureHelper structureHelper = null;
-            IBlockPattern pattern = controller.getStructurePatterns().get(DEFAULT_STRUCTURE);
+            IBlockPattern pattern = schemaInfo.getPattern();
             if (pattern instanceof BlockPattern blockPattern) {
                 Int2IntMap slices = new Int2IntArrayMap();
                 for (int i = 0; i < blockPattern.getSlices().length; i++) {
@@ -147,12 +149,27 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                 }
             } else if (structureHelper != null) {
                 AutobuildHelper.autobuild(serverPlayer, context.getItemInHand(), controller.getDefinition(), controller,
-                        resultStructure, structureHelper, flipped);
+                        resultStructure, structureHelper, flipped, structure);
             }
 
             // needed to force the multiblock to do a clean check, kinda sus
-            controller.getDefaultPatternState().getCache().clear();
-            controller.checkAndFormStructure();
+            if (structure.equals(DEFAULT_STRUCTURE)) {
+                controller.getDefaultPatternState().getCache().clear();
+                controller.checkAndFormStructure();
+            } else {
+                state.getCache().clear();
+                if (controller.checkStructurePattern(structure).getState().isValid()) {
+                    controller.formStructure(structure);
+                }
+            }
+            for (String overlay : schemaInfo.getOverlays()) {
+                var overlayState = controller.getPatternState(overlay);
+                if (overlayState == null) continue;
+                overlayState.getCache().clear();
+                if (controller.checkStructurePattern(overlay).getState().isValid()) {
+                    controller.formStructure(overlay);
+                }
+            }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
@@ -232,7 +249,8 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
         PacketDistributor.sendToServer(new CPacketTerminalSettings(hand, definition, schemaInfo.getUserSliceRepeats(),
                 schemaInfo.getUserDimensions(), schemaInfo.getUserGlobalBlockPreferences(),
                 schemaInfo.getBlockPreferences(), previewWidget.isFlipped(), previewWidget.isClearMulti(),
-                previewWidget.isClearPreferences(), schemaInfo.isIgnorePreviewCount()));
+                previewWidget.isClearPreferences(), schemaInfo.isIgnorePreviewCount())
+                .structure(schemaInfo.getStructure(), schemaInfo.getOverlays()));
     }
 
     public static void applyUserPreferences(ItemStack item, MultiblockSchemaInfo schemaInfo,

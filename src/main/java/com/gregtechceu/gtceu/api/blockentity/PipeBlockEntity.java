@@ -18,6 +18,7 @@ import com.gregtechceu.gtceu.common.data.item.GTItemAbilities;
 import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
 import com.gregtechceu.gtceu.utils.GTUtil;
+import com.gregtechceu.gtceu.utils.input.SyncedKeyMappings;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.BlockPos;
@@ -373,6 +374,10 @@ public abstract class PipeBlockEntity<PipeType extends Enum<PipeType> & IPipeTyp
         }
 
         if (toolType.contains(getPipeTuneTool())) {
+            if (player.isShiftKeyDown() && SyncedKeyMappings.VANILLA_SPRINT.isKeyDown(player) &&
+                    toggleConnectionAlongLine(gridSide, player)) {
+                return Pair.of(getPipeTuneTool(), InteractionResult.sidedSuccess(isRemote()));
+            }
             if (player.isShiftKeyDown() && this.canHaveBlockedFaces()) {
                 boolean isBlocked = this.isBlocked(gridSide);
                 this.setBlocked(gridSide, !isBlocked);
@@ -391,6 +396,47 @@ public abstract class PipeBlockEntity<PipeType extends Enum<PipeType> & IPipeTyp
         }
 
         return Pair.of(null, InteractionResult.PASS);
+    }
+
+    private static final int MAX_LINE_LENGTH = 64;
+
+    /**
+     * Opens or closes one side of this pipe and of the pipes on a straight line through it, all to what this pipe's
+     * side is not now. The line runs along whichever axis, across the side, this pipe is joined to a pipe of its own
+     * kind on; when it is joined on two, the one the player is looking along. It stops at the first pipe that is not
+     * joined to the one before it.
+     *
+     * @return false when there is no line to act on, so the click should do what it does without one
+     */
+    private boolean toggleConnectionAlongLine(Direction side, Player player) {
+        if (getLevel() == null) return false;
+        Direction along = null;
+        Direction look = Direction.getNearest(player.getLookAngle().x, player.getLookAngle().y,
+                player.getLookAngle().z);
+        for (Direction dir : GTUtil.DIRECTIONS) {
+            if (dir.getAxis() == side.getAxis() || !isLineNeighbor(this, dir)) continue;
+            if (along == null || dir.getAxis() == look.getAxis()) along = dir;
+        }
+        if (along == null) return false;
+
+        boolean open = !isConnected(side);
+        if (!getLevel().isClientSide) {
+            setConnection(side, open, false);
+            for (Direction dir : new Direction[] { along, along.getOpposite() }) {
+                PipeBlockEntity<?, ?> current = this;
+                for (int i = 0; i < MAX_LINE_LENGTH && isLineNeighbor(current, dir); i++) {
+                    current = (PipeBlockEntity<?, ?>) current.getNeighbor(dir);
+                    current.setConnection(side, open, false);
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean isLineNeighbor(PipeBlockEntity<?, ?> pipe, Direction dir) {
+        return pipe.isConnected(dir) && pipe.getNeighbor(dir) instanceof PipeBlockEntity<?, ?> other &&
+                other.getPipeType().getClass() == pipe.getPipeType().getClass() &&
+                other.isConnected(dir.getOpposite());
     }
 
     public GTToolType getPipeTuneTool() {

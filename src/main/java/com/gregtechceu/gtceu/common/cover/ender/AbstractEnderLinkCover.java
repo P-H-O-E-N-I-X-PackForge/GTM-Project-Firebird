@@ -24,6 +24,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.connection.ConnectionType;
 
 import brachy.modularui.api.drawable.IDrawable;
 import brachy.modularui.api.drawable.Text;
@@ -48,6 +49,7 @@ import brachy.modularui.widgets.*;
 import brachy.modularui.widgets.dynamic.DynamicWidget;
 import brachy.modularui.widgets.layout.Flow;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
+import io.netty.buffer.Unpooled;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
@@ -145,7 +147,7 @@ public abstract class AbstractEnderLinkCover<T extends VirtualEntry> extends Cov
 
     /**
      * All syncers registered through this method MUST use the {@link PanelSyncManager#getOrCreateSyncHandler} method
-     * for applying a syncer to a widget because it gets placed into a {@link DynamicSyncedWidget}.
+     * for applying a syncer to a widget because it gets placed into a {@link DynamicWidget}.
      *
      * @return A widget to represent the entry type for this cover
      */

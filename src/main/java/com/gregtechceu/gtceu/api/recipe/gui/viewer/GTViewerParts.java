@@ -36,7 +36,7 @@ public final class GTViewerParts {
         Flow column = Flow.col().widthRel(1f).coverChildrenHeight().childPadding(1)
                 .crossAxisAlignment(Alignment.CrossAxis.START)
                 .child(title.style(ChatFormatting.BOLD).asWidget());
-        for (IWidget row : rows) column.child(row);
+        for (IWidget row : rows) column.child(unique(row));
         return column;
     }
 
@@ -55,8 +55,19 @@ public final class GTViewerParts {
         return Component.literal(String.format("%.0f%%", chance * 100f));
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger UNIQUE = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * Gives a widget a name of its own if it has none. ModularUI treats two widgets with the same settings as the
+     * same widget and refuses to add the second to a parent, so two identical lines, slots or gaps need telling apart.
+     */
+    public static <W extends IWidget> W unique(W widget) {
+        if (widget instanceof Widget<?> w && w.getName() == null) w.name("unique_" + UNIQUE.incrementAndGet());
+        return widget;
+    }
+
     /** Empty space between sections, to keep panels evenly spaced. */
     public static IWidget gap(int height) {
-        return new Widget<>().size(1, height);
+        return unique(new Widget<>().size(1, height));
     }
 }

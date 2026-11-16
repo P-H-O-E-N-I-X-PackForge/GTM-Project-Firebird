@@ -16,6 +16,7 @@ import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -39,6 +40,10 @@ public class MutableSchema implements ISchema {
 
     @Getter
     protected final Long2ReferenceMap<BlockState> blocks = new Long2ReferenceOpenHashMap<>();
+
+    /** The structure of the multiblock this holds, which is the one formed in it. */
+    @Setter
+    private String structureName = DEFAULT_STRUCTURE;
 
     public MutableSchema() {}
 
@@ -79,10 +84,10 @@ public class MutableSchema implements ISchema {
         }
 
         if (controller != null) {
-            PatternState patternState = controller.getPatternState(DEFAULT_STRUCTURE);
-            controller.checkStructurePattern(DEFAULT_STRUCTURE);
+            PatternState patternState = controller.getPatternState(structureName);
+            controller.checkStructurePattern(structureName);
             if (patternState.getState().isValid()) {
-                controller.formStructure(DEFAULT_STRUCTURE);
+                controller.formStructure(structureName);
             }
         }
 

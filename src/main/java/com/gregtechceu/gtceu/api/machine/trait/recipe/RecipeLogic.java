@@ -24,6 +24,7 @@ import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
 import com.gregtechceu.gtceu.api.sync_system.data_transformers.gtceu.ChanceCacheTransformer;
 import com.gregtechceu.gtceu.common.cover.MachineControllerCover;
+import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.GTMath;
 
 import net.minecraft.network.chat.Component;
@@ -340,20 +341,7 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
                     runAttempt++;
                     runAttempt = (int) GTMath.clamp(runAttempt, 0, 5);
                     if (runAttempt == 5) {
-                        boolean preventPowerFail = false;
-                        if (getMachine() instanceof MultiblockControllerMachine) {
-                            var covers = getMachine().getCoverContainer().getCovers();
-                            for (var cover : covers) {
-                                if (cover instanceof MachineControllerCover mcc) {
-                                    if (mcc.preventPowerFail()) {
-                                        preventPowerFail = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (getMachine() instanceof MultiblockControllerMachine && !preventPowerFail) {
+                        if (getMachine() instanceof MultiblockControllerMachine && powerFailApplies()) {
                             runAttempt = 0;
                             // The reason recorded by setWaiting above carries over into SUSPEND.
                             setStatus(Status.SUSPEND);
@@ -368,6 +356,23 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
         if (isWaiting() || isSuspend()) {
             regressRecipe();
         }
+    }
+
+    /**
+     * Whether this multiblock stops its recipe after failing to get power. By default it does not, unless a Machine
+     * Controller cover has Power Failing turned on. With the multiblockPowerFail config, all do, unless a cover
+     * prevents it.
+     */
+    private boolean powerFailApplies() {
+        boolean prevent = false;
+        boolean enable = false;
+        for (var cover : getMachine().getCoverContainer().getCovers()) {
+            if (cover instanceof MachineControllerCover mcc) {
+                prevent |= mcc.preventPowerFail();
+                enable |= mcc.enablePowerFail();
+            }
+        }
+        return ConfigHolder.getInstance().gameplay.multiblockPowerFail ? !prevent : enable;
     }
 
     protected void regressRecipe() {

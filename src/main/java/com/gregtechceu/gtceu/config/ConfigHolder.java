@@ -833,6 +833,15 @@ public class ConfigHolder {
     public static class GameplayConfigs {
 
         @Configurable
+        @Configurable.Comment({
+                "Whether every multiblock stops its recipe after failing to get power for a few attempts.",
+                "Off, a multiblock keeps waiting for power, and only fails if a Machine Controller cover with Power",
+                "Failing turned on is on it. On, every multiblock fails unless a Machine Controller cover says to prevent it.",
+                "Default: false" })
+        @Configurable.Synchronized
+        public boolean multiblockPowerFail = false;
+
+        @Configurable
         @Configurable.Comment({ "Allow Fortune to multiply GregTech ore drops after base yields and hammer conversion.",
                 "Does not affect Silk Touch drops. Default: false" })
         public boolean enableOreFortune = false;
@@ -862,6 +871,18 @@ public class ConfigHolder {
     }
 
     public static class ClientConfigs {
+
+        @Configurable
+        @Configurable.Comment({
+                "Shrink an EMI recipe page that is too big for the room EMI has for it, which happens in a small window,",
+                "so it fits instead of running off the frame. Clicks, tooltips and slots still work on it.",
+                "Default: true" })
+        public boolean scaleOversizedEmiPages = true;
+        @Configurable
+        @Configurable.Comment({ "How small an EMI recipe page may be scaled down to, as a fraction of its size.",
+                "Default: 0.5" })
+        @Configurable.DecimalRange(min = 0.2, max = 1.0)
+        public float emiPageMinScale = 0.5f;
 
         @Configurable
         @Configurable.Comment({ "Whether or not to display all temperatures in Celsius instead of Kelvin" })

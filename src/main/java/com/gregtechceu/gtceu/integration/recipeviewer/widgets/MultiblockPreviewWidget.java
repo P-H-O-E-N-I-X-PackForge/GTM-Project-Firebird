@@ -21,6 +21,7 @@ import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewExtensions.Slot;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -28,6 +29,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -54,6 +56,8 @@ import brachy.modularui.widgets.dynamic.DynamicHandler;
 import brachy.modularui.widgets.dynamic.DynamicWidget;
 import brachy.modularui.widgets.layout.Flow;
 import brachy.modularui.widgets.menu.ContextMenuButton;
+import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.widgets.menu.Menu;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
 import com.mojang.blaze3d.platform.InputConstants;
 import it.unimi.dsi.fastutil.ints.*;
@@ -66,6 +70,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 @Accessors(chain = true)
 public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidget> {
@@ -79,6 +84,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     private final DynamicHandler partsHandler = new DynamicHandler();
     private final DynamicHandler selectedBlockHandler = new DynamicHandler();
     private final DynamicHandler structureErrorHandler = new DynamicHandler();
+    private final DynamicHandler patternsHandler = new DynamicHandler();
     private final Reference2IntMap<Block> blockCounts = new Reference2IntOpenHashMap<>();
 
     @Getter
@@ -99,6 +105,11 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     @Setter
     private @Nullable BlockPos controllerPos;
     private SelectionInfo selectionInfo = SelectionInfo.empty();
+    private @Nullable PreviewSchemaRenderer previewRenderer;
+    /** The blocks hidden by variants that are switched off; replaced whole, since the render thread reads it. */
+    private volatile Set<BlockPos> hiddenPositions = Set.of();
+    private List<MultiblockPreviewExtensions.Variant> variants = List.of();
+    private final Map<String, Boolean> variantShown = new LinkedHashMap<>();
     @Getter
     private boolean terminal;
 
@@ -124,8 +135,13 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
         this.multiblockSchemaInfo = schemaInfo == null ? new MultiblockSchemaInfo(definition) : schemaInfo;
         refreshSchema();
 
-        schemaRenderer = new SchemaRenderer(this.multiblockSchemaInfo.getMapSchema())
-                .highlightRenderer(new BlockHighlight(Color.withAlpha(Color.GREEN.brighter(1), 0.9f), 1 / 32f));
+        PreviewSchemaRenderer renderer = new PreviewSchemaRenderer(this.multiblockSchemaInfo.getMapSchema());
+        renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.GREEN.brighter(1), 0.9f), 1 / 32f));
+        this.previewRenderer = renderer;
+        schemaRenderer = renderer;
+        this.variants = MultiblockPreviewExtensions.variantsFor(this);
+        for (var variant : variants) variantShown.put(variant.id(), variant.shownByDefault());
+        resolveHiddenBlocks();
 
         IGuiAction.MouseReleased setBlockOnClick = (ctx, m) -> {
             if (m == InputConstants.MOUSE_BUTTON_LEFT) {
@@ -135,6 +151,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             .getBlockState(rayTrace.getBlockPos());
                     this.selectionInfo = SelectionInfo.of(rayTrace, state);
                     this.selectedBlockHandler.notifyUpdate();
+                    MultiblockPreviewExtensions.fireSelectionChanged(this);
                     return true;
                 }
             }
@@ -164,19 +181,23 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             ItemStack selected = this.selectionInfo.stack();
             if (selected.isEmpty()) return null;
 
-            IBlockPattern pattern = multiblockDefinition.getStructurePatterns().get("main").get();
+            IBlockPattern pattern = this.multiblockSchemaInfo.getPattern();
             if (pattern instanceof BlockPattern blockPattern) {
-                @SuppressWarnings("DataFlowIssue") // realistically it can't be null here
-                MultiPredicate predicate = this.multiblockSchemaInfo.getStructureHelper().getPredicateFromPos(
-                        blockPattern, this.selectionInfo.pos(), frontFacing, upFacing, isFlipped);
-
-                return createSelectedBlockMenu(predicate);
+                try {
+                    MultiPredicate predicate = this.multiblockSchemaInfo.getStructureHelper().getPredicateFromPos(
+                            blockPattern, this.selectionInfo.pos(), frontFacing, upFacing, isFlipped);
+                    return createSelectedBlockMenu(predicate);
+                } catch (RuntimeException e) {
+                    return null;
+                }
             } else if (pattern instanceof ExpandablePattern expandablePattern) {
-                @SuppressWarnings("DataFlowIssue") // realistically it can't be null here
-                MultiPredicate predicate = this.multiblockSchemaInfo.getStructureHelper().getPredicateFromPos(
-                        expandablePattern, this.selectionInfo.pos(), frontFacing, upFacing, isFlipped);
-
-                return createSelectedBlockMenu(predicate);
+                try {
+                    MultiPredicate predicate = this.multiblockSchemaInfo.getStructureHelper().getPredicateFromPos(
+                            expandablePattern, this.selectionInfo.pos(), frontFacing, upFacing, isFlipped);
+                    return createSelectedBlockMenu(predicate);
+                } catch (RuntimeException e) {
+                    return null;
+                }
             }
             return null;
         });
@@ -185,13 +206,14 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             var schema = this.multiblockSchemaInfo.getMapSchema();
             var controllerPos = schema.getControllerPos();
             if (schema.getLevel().getBlockEntity(controllerPos) instanceof MultiblockControllerMachine controller) {
-                if (controller.isFormed()) {
+                var structureState = controller.getPatternState(this.multiblockSchemaInfo.getStructure());
+                if (structureState == null || structureState.isFormed()) {
                     return new EmptyWidget();
                 }
                 return new Icon(GTGuiTextures.INFO).asWidget()
                         .tooltip(r -> {
                             var patternState = controller
-                                    .getPatternState(MultiblockControllerMachine.DEFAULT_STRUCTURE);
+                                    .getPatternState(this.multiblockSchemaInfo.getStructure());
                             if (!patternState.hasErrors()) return;
                             Flow col = Flow.col();
                             for (var error : patternState.getErrors()) {
@@ -207,8 +229,22 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             return new EmptyWidget();
         });
 
-        List<Map.Entry<String, IBlockPattern>> patterns = multiblockDefinition.getStructurePatterns()
-                .entrySet().stream().map(e -> Map.entry(e.getKey(), e.getValue().get())).toList();
+        this.patternsHandler.widgetProvider(() -> {
+            Flow patternColumn = Flow.col().name("structure_pattern").coverChildren();
+            Flow predicatesRow = Flow.row()
+                    .name("predicates")
+                    .height(20)
+                    .coverChildrenWidth();
+            IBlockPattern shown = this.multiblockSchemaInfo.getPattern();
+            if (shown instanceof BlockPattern blockPattern) {
+                createSliceSliders(patternColumn, blockPattern);
+                createPredicateMenus(predicatesRow, blockPattern);
+            } else if (shown instanceof ExpandablePattern expandablePattern) {
+                createConstraintSliders(patternColumn, expandablePattern);
+            }
+            patternColumn.child(predicatesRow);
+            return patternColumn;
+        });
 
         schemaRenderer.camera().setPosAndLookAt(0, 0, 0,
                 this.multiblockSchemaInfo.getMapSchema().getCenter());
@@ -225,21 +261,26 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                                 this.getMultiblockSchemaInfo().getMapSchema().getLevel(), hit.getBlockPos(),
                                 this.getContext().getMC().player);
                         text.addFromItem(pickedItem);
-                        IBlockPattern value = patterns.get(0).getValue();
+                        IBlockPattern value = this.multiblockSchemaInfo.getPattern();
                         context.updateLevel(this.multiblockSchemaInfo.getMapSchema().getLevel());
                         context.updatePos(hit.getBlockPos());
-                        MultiPredicate root = Objects.requireNonNull(this.multiblockSchemaInfo.getStructureHelper())
-                                .getPredicateFromPos(value, hit.getBlockPos(), frontFacing, upFacing, isFlipped);
-                        root.resetLogic();
-                        BasePredicate predicate = root.getPredicateAtPos(context).match();
-                        if (predicate != null) {
-                            predicate.getRecipeViewerTooltips(root).forEach(t -> text.add(t).newLine());
+                        try {
+                            MultiPredicate root = Objects.requireNonNull(this.multiblockSchemaInfo.getStructureHelper())
+                                    .getPredicateFromPos(value, hit.getBlockPos(), frontFacing, upFacing, isFlipped);
+                            root.resetLogic();
+                            BasePredicate predicate = root.getPredicateAtPos(context).match();
+                            if (predicate != null) {
+                                predicate.getRecipeViewerTooltips(root).forEach(t -> text.add(t).newLine());
+                            }
+                        } catch (RuntimeException ignored) {
+                            // a block of an overlaid structure
                         }
                     }
                 }).tooltipAutoUpdate(true)
                 .size(width, height);
 
         schema.getSchemaRenderer().updateRenderFilter((pos, state) -> {
+            if (hiddenPositions.contains(pos)) return false;
             if (yLevel == Integer.MAX_VALUE) {
                 return true;
             }
@@ -300,48 +341,25 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             if (yLevel < min) {
                                 yLevel = Integer.MAX_VALUE;
                             }
-                            refreshSchema();
-                            Reference2IntMap<Block> newBlockCounts = new Reference2IntOpenHashMap<>();
-                            for (var entry : this.multiblockSchemaInfo.getStructureBlocks().entrySet()) {
-                                if (entry.getKey().getY() <= yLevel) {
-                                    newBlockCounts.merge(entry.getValue().getBlockState().getBlock(), 1, Integer::sum);
-                                }
-                            }
-                            this.multiblockSchemaInfo.setBlockCounts(newBlockCounts);
-                            notifyWidgetHandlers();
+                            applyFilters();
                             return true;
                         }))
+                .childIf(!variants.isEmpty(), this::createVariantsMenu)
                 .childIf(MultiblockPreviewExtensions.has(Slot.TOOLBAR, definition), () -> Flow.row()
                         .name("toolbar_extensions")
-                        .left(64)
+                        .left(variants.isEmpty() ? 64 : 83)
                         .coverChildren()
                         .childPadding(1)
                         .children(MultiblockPreviewExtensions.build(Slot.TOOLBAR, this), w -> w))
                 .child(Flow.col()
                         .name("main")
                         .coverChildren()
-                        .child(new ListWidget<>()
+                        .childIf(definition.getStructurePatterns().size() > 1, this::createStructureRow)
+                        .child(new DynamicWidget<>()
                                 .name("structure_patterns")
                                 .widthRel(1f)
                                 .coverChildrenHeight()
-                                .children(patterns, e -> {
-                                    Flow patternColumn = Flow.col()
-                                            .coverChildren();
-                                    Flow predicatesRow = Flow.row()
-                                            .name("predicates")
-                                            .height(20)
-                                            .coverChildrenWidth();
-
-                                    if (e.getValue() instanceof BlockPattern blockPattern) {
-                                        createSliceSliders(patternColumn, blockPattern);
-                                        createPredicateMenus(predicatesRow, blockPattern);
-                                    } else if (e.getValue() instanceof ExpandablePattern expandablePattern) {
-                                        createConstraintSliders(patternColumn, expandablePattern);
-                                    }
-
-                                    patternColumn.child(predicatesRow);
-                                    return patternColumn;
-                                }))
+                                .clientOnlyHandler(this.patternsHandler))
                         .child(Flow.row()
                                 .name("schema_widgets")
                                 .crossAxisAlignment(Alignment.CrossAxis.START)
@@ -558,7 +576,190 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     public void refreshSchema() {
         this.multiblockSchemaInfo.refreshSchema(multiblockDefinition, frontFacing, upFacing, isFlipped,
                 onSchemaRefresh);
+        resolveHiddenBlocks();
         MultiblockPreviewExtensions.fireSchemaChanged(this);
+    }
+
+    // *** Structures ***
+
+    /** The name of the structure being shown, see {@code MultiblockMachineBuilder#pattern}. */
+    public String getStructure() {
+        return multiblockSchemaInfo.getStructure();
+    }
+
+    /** Shows another of the multiblock's structures. Its sizes and block choices start over. */
+    public void setStructure(String name) {
+        if (name.equals(getStructure())) return;
+        multiblockSchemaInfo.selectStructure(name);
+        selectionInfo = SelectionInfo.empty();
+        yLevel = Integer.MAX_VALUE;
+        selectedBlockHandler.notifyUpdate();
+        patternsHandler.notifyUpdate();
+        applyFilters();
+        if (schemaRenderer != null) {
+            schemaRenderer.camera().setPosAndLookAt(0, 0, 0, multiblockSchemaInfo.getMapSchema().getCenter());
+        }
+        MultiblockPreviewExtensions.fireSelectionChanged(this);
+    }
+
+    /** Shows another of the multiblock's structures on top of the selected one, or stops showing it. */
+    public void setOverlay(String name, boolean on) {
+        if (multiblockSchemaInfo.isOverlay(name) == on) return;
+        multiblockSchemaInfo.setOverlay(name, on);
+        applyFilters();
+    }
+
+    /**
+     * A row of buttons, one for each structure, under the toolbar: the name shows that structure and the plus beside it
+     * shows it on top of the selected one. It is not a menu, since the buttons of a menu are drawn without their state
+     * and a click on them can close it.
+     */
+    private Flow createStructureRow() {
+        var font = Minecraft.getInstance().font;
+        Flow row = Flow.row().name("structures").coverChildren().childPadding(3).margin(0, 1);
+        for (String name : multiblockDefinition.getStructurePatterns().keySet()) {
+            row.child(Flow.row().coverChildren().childPadding(1)
+                    .child(new ToggleButton()
+                            .size(font.width(name) + 8, 14)
+                            .value(new BoolValue.Dynamic(() -> name.equals(getStructure()), shown -> {
+                                if (shown) setStructure(name);
+                            }))
+                            .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structure_show")))
+                            .overlay(Text.str(name).asIcon().size(font.width(name) + 2, 8)))
+                    .child(new ToggleButton()
+                            .size(14, 14)
+                            .value(new BoolValue.Dynamic(() -> multiblockSchemaInfo.isOverlay(name),
+                                    on -> setOverlay(name, on)))
+                            .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structure_overlay")))
+                            .overlay(Text.str("+").asIcon().size(font.width("+") + 2, 8))));
+        }
+        return row;
+    }
+
+    /**
+     * A menu of a fixed width. The menu of {@code ContextMenuButton#menuList} is as wide as its button, which is too
+     * narrow for anything with text in it.
+     */
+    private static Menu<?> sizedMenu(int width, Consumer<ListWidget<IWidget, ?>> content) {
+        ListWidget<IWidget, ?> list = new ListWidget<>().widthRel(1f);
+        content.accept(list);
+        return new Menu<>().width(width).coverChildrenHeight().child(list);
+    }
+
+    // *** Variants ***
+
+    /** The parts of this multiblock that can be shown or hidden. */
+    public List<MultiblockPreviewExtensions.Variant> getVariants() {
+        return variants;
+    }
+
+    public boolean isVariantShown(String id) {
+        return variantShown.getOrDefault(id, true);
+    }
+
+    /** Shows or hides a variant: its blocks leave or join the 3D view and the parts list. */
+    public void setVariantShown(String id, boolean shown) {
+        if (isVariantShown(id) == shown) return;
+        variantShown.put(id, shown);
+        applyFilters();
+    }
+
+    private void resolveHiddenBlocks() {
+        if (variants.isEmpty()) return;
+        Set<BlockPos> hidden = new HashSet<>();
+        for (var variant : variants) {
+            if (!isVariantShown(variant.id())) hidden.addAll(variant.positions().apply(this));
+        }
+        hiddenPositions = Set.copyOf(hidden);
+    }
+
+    /** Rebuilds the 3D view and the parts list after something that hides blocks changed: a layer or a variant. */
+    private void applyFilters() {
+        refreshSchema();
+        Reference2IntMap<Block> counts = new Reference2IntOpenHashMap<>();
+        for (var entry : this.multiblockSchemaInfo.getStructureBlocks().entrySet()) {
+            BlockPos pos = entry.getKey();
+            if (hiddenPositions.contains(pos) || pos.getY() > yLevel) continue;
+            counts.merge(entry.getValue().getBlockState().getBlock(), 1, Integer::sum);
+        }
+        this.multiblockSchemaInfo.setBlockCounts(counts);
+        notifyWidgetHandlers();
+    }
+
+    private int variantsMenuWidth() {
+        int width = 40;
+        for (var variant : variants) {
+            width = Math.max(width, Minecraft.getInstance().font.width(variant.label()) + 12);
+        }
+        return width + 4;
+    }
+
+    private ContextMenuButton<?> createVariantsMenu() {
+        return new ContextMenuButton<>("variants")
+                .size(16)
+                .left(64)
+                .overlay(Text.str("V").asIcon())
+                .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.variants")))
+                .requiresClick()
+                .openRightDown()
+                .menu(sizedMenu(variantsMenuWidth(), list -> list
+                        .coverChildrenHeight()
+                        .childSeparator(Icon.EMPTY_2PX)
+                        .children(variants, variant -> new ToggleButton()
+                                .size(variantsMenuWidth() - 4, 14)
+                                .value(new BoolValue.Dynamic(() -> isVariantShown(variant.id()),
+                                        shown -> setVariantShown(variant.id(), shown)))
+                                .overlay(Text.of(variant.label()).asIcon()
+                                        .size(Minecraft.getInstance().font.width(variant.label()) + 2, 8)))));
+    }
+
+    // *** For widgets added with MultiblockPreviewExtensions ***
+
+    /** Whether a block is selected, by clicking it in the 3D view. */
+    public boolean hasSelection() {
+        return !selectionInfo.stack().isEmpty();
+    }
+
+    /** The position of the selected block in the preview's world, see {@link #toPreviewPos}. */
+    public @Nullable BlockPos getSelectedPos() {
+        return hasSelection() ? selectionInfo.pos() : null;
+    }
+
+    /** The selected block's state, or air if none is selected. */
+    public BlockState getSelectedState() {
+        return hasSelection() ? selectionInfo.state() : Blocks.AIR.defaultBlockState();
+    }
+
+    /** The selected block as an item, or an empty stack if none is selected. */
+    public ItemStack getSelectedStack() {
+        return hasSelection() ? selectionInfo.stack() : ItemStack.EMPTY;
+    }
+
+    /**
+     * Outlines blocks in the 3D view, in a layer of your own: setting the layer again replaces what it outlined.
+     *
+     * @param layer     a name for the layer, to change or clear it later; use your mod id in it
+     * @param positions positions in the preview's world, see {@link #toPreviewPos}
+     * @param argb      the colour, with alpha
+     */
+    public void highlight(String layer, Collection<BlockPos> positions, int argb) {
+        if (previewRenderer != null) previewRenderer.setLayer(layer, positions, argb);
+    }
+
+    public void clearHighlight(String layer) {
+        if (previewRenderer != null) previewRenderer.clearLayer(layer);
+    }
+
+    public void clearHighlights() {
+        if (previewRenderer != null) previewRenderer.clearLayers();
+    }
+
+    /**
+     * A position in the preview's world from one relative to the controller, such as {@code (0, 1, 0)} for the block
+     * above it, taken in the controller's own orientation.
+     */
+    public BlockPos toPreviewPos(BlockPos fromController) {
+        return multiblockSchemaInfo.getMapSchema().getControllerPos().offset(fromController);
     }
 
     private Flow extensionColumn(Slot slot) {

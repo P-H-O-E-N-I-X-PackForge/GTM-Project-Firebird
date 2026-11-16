@@ -141,3 +141,67 @@ Editing the color of an existing material:
     ```
 
 1. Most methods in the [``Material`` class](https://github.com/GregTechCEu/GregTech-Modern/blob/1.20.1/src/main/java/com/gregtechceu/gtceu/api/data/chemical/material/Material.java) can be used in the `PostMaterialEvent`/``materialModification`` event
+
+
+## Changing a property a material already has
+
+`setProperty` only adds: it throws if the material already has that property. To change one that is there, use
+`modifyProperty` to edit it in place, or `replaceProperty` to swap in a new one. Both also work for a property the
+material does not have yet; `modifyProperty` starts from a default one.
+
+=== "Java"
+    ```java title="AddonMod.java"
+    @SubscribeEvent
+    public static void materialModification(PostMaterialEvent event) {
+        // Edit the tool property in place
+        GTMaterials.Iron.modifyProperty(PropertyKey.TOOL, tool -> {
+            tool.setDurability(2000);
+            tool.setHarvestLevel(3);
+        });
+
+        // Or replace it with a new one
+        GTMaterials.Copper.replaceProperty(PropertyKey.TOOL, ToolProperty.Builder.of(6.0F, 3.0F, 600, 2).build());
+    }
+    ```
+=== "JavaScript"
+    ```js title="tool_property.js"
+    GTCEuStartupEvents.materialModification(event => {
+        // Edit the tool property in place
+        GTMaterials.Iron.modifyProperty(PropertyKey.TOOL, tool => {
+            tool.setDurability(2000)
+            tool.setHarvestLevel(3)
+        })
+
+        // Or replace it with a new one
+        GTMaterials.Copper.replaceProperty(PropertyKey.TOOL, ToolProperty.Builder.of(6, 3, 600, 2).build())
+    })
+    ```
+
+## Changing the fluids a material already has
+
+`modifyFluid` changes how one of the material's fluids will be built. It works for any `FluidBuilder` option, for
+example the textures, and has to be done in the same event, before the fluids are registered.
+
+=== "Java"
+    ```java title="AddonMod.java"
+    @SubscribeEvent
+    public static void materialModification(PostMaterialEvent event) {
+        // Textures of your own, from any namespace. The last value is whether the fluid's color tints them.
+        GTMaterials.Iron.modifyFluid(FluidStorageKeys.LIQUID, fluid -> fluid.textures(
+                ResourceLocation.parse("mymod:block/fluids/iron_still"),
+                ResourceLocation.parse("mymod:block/fluids/iron_flow"), false));
+
+        // Or a fluid icon set, see the Icon Sets page
+        GTMaterials.Copper.modifyFluid(FluidStorageKeys.LIQUID, fluid -> fluid.iconSet(MaterialIconSet.LAVA));
+    }
+    ```
+=== "JavaScript"
+    ```js title="fluid_textures.js"
+    GTCEuStartupEvents.materialModification(event => {
+        GTMaterials.Iron.modifyFluid(GTFluidStorageKeys.LIQUID, fluid =>
+            fluid.textures('kubejs:block/fluids/iron_still', 'kubejs:block/fluids/iron_flow', false))
+
+        GTMaterials.Copper.modifyFluid(GTFluidStorageKeys.LIQUID, fluid =>
+            fluid.iconSet(GTMaterialIconSet.LAVA))
+    })
+    ```

@@ -468,7 +468,15 @@ public class LangHandler {
                 "§eNormal§r - in this mode, the cover will require a signal weaker than the set redstone level to run");
         provider.add("cover.machine_controller.control", "Controller Target");
         provider.add("cover.machine_controller.redstone", "Min Redstone Strength: %d");
+        provider.add("gtceu.gui.output_side.back", "Back");
+        provider.add("gtceu.gui.output_side.left", "Left");
+        provider.add("gtceu.gui.output_side.right", "Right");
+        provider.add("gtceu.gui.output_side.top", "Top");
+        provider.add("gtceu.gui.output_side.bottom", "Bottom");
+        provider.add("gtceu.gui.output_side.hint", "Shift-click to choose the output side");
+        provider.add("gtceu.preview.variants", "Variants");
         provider.add("cover.machine_controller.suspend_powerfail", "Prevent Power Failing:");
+        provider.add("cover.machine_controller.enable_powerfail", "Power Failing:");
         provider.add("cover.machine_controller.mode.machine", "Control Machine");
         provider.add("cover.machine_controller.mode.cover_up", "Control Cover (Top)");
         provider.add("cover.machine_controller.mode.cover_down", "Control Cover (Bottom)");

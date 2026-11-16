@@ -33,7 +33,23 @@ public class MaterialIconSet {
     public static final Holder<MaterialIconSet> CERTUS = REGISTRATE.materialIconSet("certus", QUARTZ);
     public static final Holder<MaterialIconSet> LAPIS = REGISTRATE.materialIconSet("lapis", QUARTZ);
     public static final Holder<MaterialIconSet> FLUID = REGISTRATE.materialIconSet("fluid");
+    /** For fluids that should look like water: a fluid iconset of its own, with vanilla's water textures. */
+    public static final Holder<MaterialIconSet> WATER = REGISTRATE.materialIconSet("water", FLUID);
+    /** For fluids that should look like lava. */
+    public static final Holder<MaterialIconSet> LAVA = REGISTRATE.materialIconSet("lava", FLUID);
     public static final Holder<MaterialIconSet> RADIOACTIVE = REGISTRATE.materialIconSet("radioactive", METALLIC);
+
+    static {
+        // vanilla's own, so these two look like what they are without GT shipping a copy of them
+        com.gregtechceu.gtceu.api.fluids.FluidBuilder.registerIconSetTextures(
+                com.gregtechceu.gtceu.GTCEu.id("water"),
+                ResourceLocation.withDefaultNamespace("block/water_still"),
+                ResourceLocation.withDefaultNamespace("block/water_flow"), true);
+        com.gregtechceu.gtceu.api.fluids.FluidBuilder.registerIconSetTextures(
+                com.gregtechceu.gtceu.GTCEu.id("lava"),
+                ResourceLocation.withDefaultNamespace("block/lava_still"),
+                ResourceLocation.withDefaultNamespace("block/lava_flow"), false);
+    }
 
     // Implementation -----------------------------------------------------------------------------------------------
 

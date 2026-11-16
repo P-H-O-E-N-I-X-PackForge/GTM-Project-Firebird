@@ -267,7 +267,7 @@ public class QuantumChestMachine extends TieredMachine implements IControllable,
                         .child(Flow.row()
                                 .margin(4, 0, 41, 0)
                                 .coverChildren()
-                                .child(GTMuiWidgets.createAutoOutputItemButton(autoOutput))
+                                .child(GTMuiWidgets.createAutoOutputItemButton(autoOutput, syncManager))
                                 .child(GTMuiWidgets.createToggleButton(this::isLocked, this::setLocked,
                                         GTGuiTextures.BUTTON_LOCK, "gtceu.gui.item_lock.tooltip"))
                                 .child(GTMuiWidgets.createToggleButton(this::isVoiding, this::setVoiding,

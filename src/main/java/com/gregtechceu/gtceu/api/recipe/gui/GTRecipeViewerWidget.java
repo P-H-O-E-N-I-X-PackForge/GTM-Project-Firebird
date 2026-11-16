@@ -49,8 +49,11 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
     private final GTRecipeType recipeType;
     private final GTRecipeTypeUILayout uiLayout;
 
+    // These cover their width too: with a width taken from the panel, a long line (a condition's text, say) did not
+    // widen
+    // the panel and ran out of its frame.
     public final Flow textComponents = Flow.col()
-            .widthRel(1f)
+            .coverChildrenWidth(0)
             .coverChildrenHeight()
             .childPadding(1)
             .crossAxisAlignment(Alignment.CrossAxis.START)
@@ -61,7 +64,7 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
 
     public final ParentWidget<?> recipeContentRow;
     public final ParentWidget<?> additionalRecipeContent = new ParentWidget<>()
-            .coverChildrenHeight().widthRel(1f);
+            .coverChildrenHeight().coverChildrenWidth(0);
 
     private final int minTier;
     private int tier;
@@ -78,7 +81,9 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
         this.minTier = RecipeHelper.getRecipeEUtTier(recipe);
         this.tier = minTier;
 
-        Flow mainColumn = Flow.col().widthRel(1f).coverChildrenHeight();
+        // Covers its width too, with a minimum: a column that took its width from the panel left the panel at the
+        // minimum width however wide the slots and text inside it were, so wide pages overflowed their frame.
+        Flow mainColumn = Flow.col().coverChildrenWidth(150).coverChildrenHeight();
 
         child(mainColumn);
         margin(2, 2, 2, 1);
@@ -159,6 +164,8 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
     private void checkSize() {
         if (sizeListener == null) return;
         var area = getPanel().getArea();
+        // the panel reads as 0 by 0 while it is being laid out again; that is not a size to report
+        if (area.width <= 0 || area.height <= 0) return;
         if (area.width == lastWidth && area.height == lastHeight) return;
         lastWidth = area.width;
         lastHeight = area.height;

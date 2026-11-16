@@ -11,6 +11,7 @@ import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.common.cover.data.ControllerMode;
 import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.common.mui.GTMuiWidgets;
+import com.gregtechceu.gtceu.config.ConfigHolder;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.BlockPos;
@@ -68,6 +69,12 @@ public class MachineControllerCover extends CoverBehavior implements IMuiCover {
     @Accessors(fluent = true)
     @SaveField
     private boolean preventPowerFail = false;
+
+    /** Used when the multiblockPowerFail config is off: this machine then does stop its recipe when out of power. */
+    @Getter
+    @Accessors(fluent = true)
+    @SaveField
+    private boolean enablePowerFail = false;
 
     public MachineControllerCover(CoverDefinition definition, ICoverable coverHolder, Direction attachedSide) {
         super(definition, coverHolder, attachedSide);
@@ -225,13 +232,25 @@ public class MachineControllerCover extends CoverBehavior implements IMuiCover {
                         .child(coverUIRow()
                                 .child(new ToggleButton()
                                         .size(16).left(0)
-                                        .value(new BooleanSyncValue(() -> preventPowerFail,
-                                                bool -> preventPowerFail = bool).allowC2S())
+                                        .value(new BooleanSyncValue(
+                                                () -> ConfigHolder.getInstance().gameplay.multiblockPowerFail ?
+                                                        preventPowerFail : enablePowerFail,
+                                                bool -> {
+                                                    if (ConfigHolder.getInstance().gameplay.multiblockPowerFail) {
+                                                        preventPowerFail = bool;
+                                                    } else {
+                                                        enablePowerFail = bool;
+                                                    }
+                                                }).allowC2S())
                                         .background(false,
                                                 GTGuiTextures.BUTTON_POWER[0])
                                         .background(true,
                                                 GTGuiTextures.BUTTON_POWER[1]))
-                                .child(Text.lang("cover.machine_controller.suspend_powerfail").asWidget()
+                                .child(Text.dynamic(() -> Component.translatable(
+                                        ConfigHolder.getInstance().gameplay.multiblockPowerFail ?
+                                                "cover.machine_controller.suspend_powerfail" :
+                                                "cover.machine_controller.enable_powerfail"))
+                                        .asWidget()
                                         .heightRel(1.0f).left(20)))
                         .child(coverUIRow()
                                 .child(Text
@@ -322,6 +341,7 @@ public class MachineControllerCover extends CoverBehavior implements IMuiCover {
         tag.putBoolean("inverted", isInverted);
         tag.putInt("redstoneLvl", minRedstoneStrength);
         tag.putBoolean("preventPowerfail", preventPowerFail);
+        tag.putBoolean("enablePowerfail", enablePowerFail);
     }
 
     @Override
@@ -329,6 +349,7 @@ public class MachineControllerCover extends CoverBehavior implements IMuiCover {
         setInverted(tag.getBoolean("inverted"));
         setMinRedstoneStrength(tag.getInt("redstoneLvl"));
         preventPowerFail = tag.getBoolean("preventPowerfail");
+        enablePowerFail = tag.getBoolean("enablePowerfail");
         super.pasteConfig(player, tag);
     }
 }

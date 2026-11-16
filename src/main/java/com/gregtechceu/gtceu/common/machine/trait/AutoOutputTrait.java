@@ -297,8 +297,8 @@ public class AutoOutputTrait extends MachineTrait implements IRenderingTrait, II
 
     @Override
     public void attachRightConfigurators(Flow flow, ModularPanel<?> panel, PanelSyncManager syncManager) {
-        flow.childIf(supportsAutoOutputItems(), () -> GTMuiWidgets.createAutoOutputItemButton(this))
-                .childIf(supportsAutoOutputFluids(), () -> GTMuiWidgets.createAutoOutputFluidButton(this))
+        flow.childIf(supportsAutoOutputItems(), () -> GTMuiWidgets.createAutoOutputItemButton(this, syncManager))
+                .childIf(supportsAutoOutputFluids(), () -> GTMuiWidgets.createAutoOutputFluidButton(this, syncManager))
                 .childIf(supportsAutoOutputItems(), () -> GTMuiWidgets.createInputFromOutputItem(this))
                 .childIf(supportsAutoOutputFluids(), () -> GTMuiWidgets.createInputFromOutputFluid(this));
     }

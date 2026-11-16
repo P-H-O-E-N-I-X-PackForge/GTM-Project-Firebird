@@ -49,9 +49,11 @@ public final class ProxySlotRecipeHandler {
         private final ProxyFluidRecipeHandler slotFluid;
 
         private @Nullable MEPatternBufferPartMachine buffer;
+        private final MEPatternBufferProxyPartMachine machine;
 
         public ProxyRHL(MEPatternBufferProxyPartMachine machine) {
             super(IO.IN);
+            this.machine = machine;
             circuit = machine.attachTrait(new ProxyItemRecipeHandler());
             sharedItem = machine.attachTrait(new ProxyItemRecipeHandler());
             slotItem = machine.attachTrait(new ProxyItemRecipeHandler());
@@ -85,7 +87,7 @@ public final class ProxySlotRecipeHandler {
                                                                    boolean simulate) {
             MEPatternBufferPartMachine buf = buffer;
             if (buf == null) return contents;
-            return buf.getBufferRecipeHandler().handleRecipe(io, recipe, contents, simulate);
+            return buf.handleBufferRecipe(machine, io, recipe, contents, simulate);
         }
 
         @Override

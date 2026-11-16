@@ -51,8 +51,7 @@ public class MultiblockMachineDefinition extends MachineDefinition {
 
     @Getter
     private final boolean generator;
-    @Getter
-    private final Map<String, Supplier<IBlockPattern>> structurePatterns;
+    private volatile Map<String, Supplier<IBlockPattern>> structurePatterns;
     @Getter
     private final boolean allowFlip;
     @Getter
@@ -67,6 +66,34 @@ public class MultiblockMachineDefinition extends MachineDefinition {
     private final TriFunction<MultiblockControllerMachine, MultiblockPartMachine, Direction, BlockState> partAppearance;
     @Getter
     private final BiFunction<MultiblockControllerMachine, PanelSyncManager, List<IWidget>> additionalDisplay;
+
+    public Map<String, Supplier<IBlockPattern>> getStructurePatterns() {
+        return structurePatterns;
+    }
+
+    /**
+     * Replaces one of the multiblock's structures, or adds one under a new name, for addons that change another mod's
+     * multiblock. Call it during setup, for example in {@code FMLCommonSetupEvent#enqueueWork}, before any world is
+     * loaded: controllers read their patterns when they are created. Previews and the terminal pick the change up
+     * with no further work.
+     *
+     * @param name    the structure's name; {@code "main"} is the default one
+     * @param pattern builds the pattern, the first time it is needed
+     */
+    public synchronized void setStructurePattern(String name,
+                                                 Function<MultiblockMachineDefinition, IBlockPattern> pattern) {
+        Map<String, Supplier<IBlockPattern>> updated = new LinkedHashMap<>(structurePatterns);
+        updated.put(name, GTMemoizer.memoize(() -> pattern.apply(this)));
+        structurePatterns = Collections.unmodifiableMap(updated);
+    }
+
+    /** Takes away a structure added with {@link #setStructurePattern}. The default structure cannot be removed. */
+    public synchronized void removeStructurePattern(String name) {
+        if (name.equals(MultiblockControllerMachine.DEFAULT_STRUCTURE) || !structurePatterns.containsKey(name)) return;
+        Map<String, Supplier<IBlockPattern>> updated = new LinkedHashMap<>(structurePatterns);
+        updated.remove(name);
+        structurePatterns = Collections.unmodifiableMap(updated);
+    }
 
     public MultiblockMachineDefinition(ResourceLocation id, Properties properties) {
         super(id, properties);

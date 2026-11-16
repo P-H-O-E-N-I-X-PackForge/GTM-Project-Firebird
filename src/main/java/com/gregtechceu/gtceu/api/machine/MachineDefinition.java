@@ -10,6 +10,7 @@ import com.gregtechceu.gtceu.api.mui.factory.PanelFactory;
 import com.gregtechceu.gtceu.api.recipe.GTRecipe;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
 import com.gregtechceu.gtceu.api.recipe.category.GTRecipeCategory;
+import com.gregtechceu.gtceu.api.recipe.modifier.GlobalRecipeModifiers;
 import com.gregtechceu.gtceu.api.recipe.modifier.RecipeModifier;
 import com.gregtechceu.gtceu.api.recipe.modifier.RecipeModifierList;
 import com.gregtechceu.gtceu.api.registry.registrate.builder.MachineBuilder;
@@ -78,8 +79,9 @@ public class MachineDefinition implements ItemLike {
     private final int tier;
     @Getter
     private final IntSupplier defaultPaintingColor;
-    @Getter
     private final RecipeModifier recipeModifier;
+    private volatile RecipeModifier globalRecipeModifier;
+    private volatile int globalRecipeModifierVersion = -1;
     @Getter
     private final boolean alwaysTryModifyRecipe;
     @Getter
@@ -119,6 +121,16 @@ public class MachineDefinition implements ItemLike {
     private final MachineRenderState defaultRenderState;
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
+    /** The machine's modifier, with the ones from {@link GlobalRecipeModifiers} that apply to it. */
+    public RecipeModifier getRecipeModifier() {
+        int current = GlobalRecipeModifiers.version();
+        if (globalRecipeModifierVersion != current) {
+            globalRecipeModifier = GlobalRecipeModifiers.wrap(this, recipeModifier);
+            globalRecipeModifierVersion = current;
+        }
+        return globalRecipeModifier;
+    }
+
     public MachineDefinition(ResourceLocation id, Properties properties) {
         this.id = id;
 

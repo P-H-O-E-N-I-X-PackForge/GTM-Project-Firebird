@@ -42,13 +42,6 @@ public abstract class GTModularEmiRecipe extends ModularUIEmiRecipe {
         this.ui = ui;
     }
 
-    private static int debugBudget = 80;
-
-    /** A short trace of how recipe pages are sized, for tracking down layout problems; it stops after a while. */
-    private static void debug(String message, Object... args) {
-        if (debugBudget-- > 0) com.gregtechceu.gtceu.GTCEu.LOGGER.info("[GTViewer size] " + message, args);
-    }
-
     // *** Size ***
 
     /**
@@ -62,8 +55,6 @@ public abstract class GTModularEmiRecipe extends ModularUIEmiRecipe {
         ModularScreen screen = createScreen(ui.get(), getId().getNamespace(), "emi_recipe_" + getId().getPath());
         bounds = adjustSize(EmbedHandler.getEmbedWidth(screen), EmbedHandler.getEmbedHeight(screen));
         hosts = findHosts(screen.getMainPanel());
-        debug("measured {} -> {}x{}, panel at {},{}, {} host(s)", getId(), bounds.width(), bounds.height(),
-                screen.getMainPanel().getArea().x, screen.getMainPanel().getArea().y, hosts.size());
     }
 
     /**
@@ -102,10 +93,9 @@ public abstract class GTModularEmiRecipe extends ModularUIEmiRecipe {
      * from that laid out panel, then asks EMI to lay the page out again.
      */
     private void onPanelResized(IWidget panelWidget, int width, int height) {
+        if (width <= 0 || height <= 0) return;
         Bounds reported = adjustSize(width, height);
         var panelArea = panelWidget.getPanel().getArea();
-        debug("reported {} -> {}x{} (had {}x{}), panel at {},{}", getId(), reported.width(), reported.height(),
-                bounds.width(), bounds.height(), panelArea.x, panelArea.y);
         if (reported.width() == bounds.width() && reported.height() == bounds.height()) return;
         measured = true;
         bounds = reported;

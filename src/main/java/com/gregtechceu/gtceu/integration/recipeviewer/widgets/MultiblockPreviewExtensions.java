@@ -2,13 +2,18 @@ package com.gregtechceu.gtceu.integration.recipeviewer.widgets;
 
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+
 import brachy.modularui.api.widget.IWidget;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -53,8 +58,27 @@ public final class MultiblockPreviewExtensions {
 
     private record Entry(Slot slot, Predicate<MultiblockMachineDefinition> appliesTo, Builder builder) {}
 
+    /**
+     * A part of a multiblock the player can show or hide in the preview, such as an optional block or an expansion.
+     * Hiding it takes its blocks out of the 3D view and the parts list.
+     *
+     * @param id             an id for the variant, unique among a preview's variants; use your mod id in it
+     * @param label          its name in the menu
+     * @param shownByDefault whether it is shown when the preview opens
+     * @param positions      the blocks it is made of, in the preview's world, see
+     *                       {@link MultiblockPreviewWidget#toPreviewPos}; asked again whenever the structure changes
+     */
+    public record Variant(String id, Component label, boolean shownByDefault,
+                          Function<MultiblockPreviewWidget, Collection<BlockPos>> positions) {}
+
+    private record VariantEntry(Predicate<MultiblockMachineDefinition> appliesTo,
+                                Function<MultiblockPreviewWidget, List<Variant>> provider) {}
+
+    private static final List<VariantEntry> VARIANTS = new CopyOnWriteArrayList<>();
+
     private static final List<Entry> ENTRIES = new CopyOnWriteArrayList<>();
     private static final List<Consumer<MultiblockPreviewWidget>> SCHEMA_LISTENERS = new CopyOnWriteArrayList<>();
+    private static final List<Consumer<MultiblockPreviewWidget>> SELECTION_LISTENERS = new CopyOnWriteArrayList<>();
 
     private MultiblockPreviewExtensions() {}
 
@@ -74,6 +98,38 @@ public final class MultiblockPreviewExtensions {
      */
     public static void onSchemaChanged(Consumer<MultiblockPreviewWidget> listener) {
         SCHEMA_LISTENERS.add(listener);
+    }
+
+    /**
+     * Called whenever the player clicks a block in a preview's 3D view, which selects it. Read it from the preview with
+     * {@link MultiblockPreviewWidget#getSelectedPos()} and the methods after it.
+     */
+    public static void onSelectionChanged(Consumer<MultiblockPreviewWidget> listener) {
+        SELECTION_LISTENERS.add(listener);
+    }
+
+    static void fireSelectionChanged(MultiblockPreviewWidget preview) {
+        for (var listener : SELECTION_LISTENERS) listener.accept(preview);
+    }
+
+    /**
+     * Adds variants to the preview of the multiblocks {@code appliesTo} accepts. {@code provider} is called once for
+     * each preview, as it is made, and returns that preview's variants. A preview with variants gets a menu in its
+     * toolbar to toggle them.
+     */
+    public static void registerVariants(Predicate<MultiblockMachineDefinition> appliesTo,
+                                        Function<MultiblockPreviewWidget, List<Variant>> provider) {
+        VARIANTS.add(new VariantEntry(appliesTo, provider));
+    }
+
+    static List<Variant> variantsFor(MultiblockPreviewWidget preview) {
+        List<Variant> variants = new ArrayList<>();
+        for (VariantEntry entry : VARIANTS) {
+            if (entry.appliesTo().test(preview.getMultiblockDefinition())) {
+                variants.addAll(entry.provider().apply(preview));
+            }
+        }
+        return variants;
     }
 
     static boolean has(Slot slot, MultiblockMachineDefinition definition) {

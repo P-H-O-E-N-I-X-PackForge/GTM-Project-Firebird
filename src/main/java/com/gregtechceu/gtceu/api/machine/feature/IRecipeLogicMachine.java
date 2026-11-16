@@ -154,6 +154,10 @@ public interface IRecipeLogicMachine extends IRecipeCapabilityHolder, IMachineFe
         for (var rlTrait : self().getTraitHolder().getTraitsByInterface(IRecipeLogicModifierTrait.class)) {
             rlTrait.afterWorking();
         }
+        if (!self().isRemote()) {
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gregtechceu.gtceu.api.events.MachineRecipeFinishedEvent(
+                    this, getRecipeLogic().getLastRecipe()));
+        }
     }
 
     default boolean shouldWorkingPlaySound() {

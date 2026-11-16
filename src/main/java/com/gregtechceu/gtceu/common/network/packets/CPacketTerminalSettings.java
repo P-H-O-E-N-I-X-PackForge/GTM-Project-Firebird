@@ -2,6 +2,7 @@ package com.gregtechceu.gtceu.common.network.packets;
 
 import com.gregtechceu.gtceu.GTCEu;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
+import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
 import com.gregtechceu.gtceu.api.mui.MultiblockSchemaInfo;
 import com.gregtechceu.gtceu.api.multiblock.util.BlockInfo;
 import com.gregtechceu.gtceu.api.sync_system.data_transformers.SyncSystemCodecs;
@@ -48,9 +49,11 @@ public class CPacketTerminalSettings implements CustomPacketPayload {
     boolean isClearMulti;
     boolean isClearPreferences;
     boolean ignorePreviewCount;
+    String structure = MultiblockControllerMachine.DEFAULT_STRUCTURE;
+    java.util.List<String> overlays = java.util.List.of();
 
     // spotless:off
-    public static final StreamCodec<RegistryFriendlyByteBuf, CPacketTerminalSettings> CODEC = GTStreamCodecUtils.composite(
+    private static final StreamCodec<RegistryFriendlyByteBuf, CPacketTerminalSettings> BASE_CODEC = GTStreamCodecUtils.composite(
             GTStreamCodecUtils.enumStreamCodec(InteractionHand.class), CPacketTerminalSettings::hand,
             MultiblockMachineDefinition.STREAM_CODEC, CPacketTerminalSettings::machineDefinition,
             ByteBufCodecs.map(Int2IntArrayMap::new, ByteBufCodecs.VAR_INT, ByteBufCodecs.VAR_INT), CPacketTerminalSettings::sliceRepeats,
@@ -63,6 +66,26 @@ public class CPacketTerminalSettings implements CustomPacketPayload {
             ByteBufCodecs.BOOL, CPacketTerminalSettings::ignorePreviewCount,
             CPacketTerminalSettings::new);
     // spotless:on
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, CPacketTerminalSettings> CODEC = StreamCodec.of(
+            (buf, packet) -> {
+                BASE_CODEC.encode(buf, packet);
+                ByteBufCodecs.STRING_UTF8.encode(buf, packet.structure);
+                ByteBufCodecs.<io.netty.buffer.ByteBuf, String, java.util.List<String>>collection(java.util.ArrayList::new,
+                        ByteBufCodecs.STRING_UTF8).encode(buf, packet.overlays);
+            }, buf -> {
+                CPacketTerminalSettings packet = BASE_CODEC.decode(buf);
+                packet.structure = ByteBufCodecs.STRING_UTF8.decode(buf);
+                packet.overlays = ByteBufCodecs.<io.netty.buffer.ByteBuf, String, java.util.List<String>>collection(java.util.ArrayList::new,
+                        ByteBufCodecs.STRING_UTF8).decode(buf);
+                return packet;
+            });
+
+    public CPacketTerminalSettings structure(String structure, java.util.List<String> overlays) {
+        this.structure = structure;
+        this.overlays = overlays;
+        return this;
+    }
 
     public CPacketTerminalSettings(InteractionHand hand,
                                    MultiblockMachineDefinition def,
@@ -94,7 +117,8 @@ public class CPacketTerminalSettings implements CustomPacketPayload {
             if (!GTItems.TERMINAL.isIn(held)) return;
 
             var schemaInfo = new MultiblockSchemaInfo(this.machineDefinition, this.sliceRepeats, this.dimensions,
-                    this.globalPreferences, this.blockPreferences, this.isFlipped, this.ignorePreviewCount);
+                    this.globalPreferences, this.blockPreferences, this.isFlipped, this.ignorePreviewCount,
+                    this.structure, this.overlays);
             TerminalBehavior.applyUserPreferences(held, schemaInfo, this.isClearMulti, this.isClearPreferences);
         }
     }
