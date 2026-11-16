@@ -23,6 +23,11 @@ import java.util.List;
 
 public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
 
+    /** The column that holds the main contents and, under them, the player inventory when there is one. */
+    @lombok.Getter
+    private Flow contentsColumn;
+
+
     public static final int DEFAULT_CONTENT_WIDTH = 169;
     public static final int DEFAULT_CONTENT_HEIGHT = 77;
 
@@ -30,6 +35,26 @@ public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
     protected final Flow leftConfiguratorPanel, rightConfiguratorPanel;
     @Getter
     protected final ParentWidget<?> mainContents;
+
+    /**
+     * The panel is drawn smaller when it is too big for the window, so a large UI still fits on the screen. This adds to
+     * the scale ModularUI uses for the opening animation, and its hit testing follows it. See
+     * {@code ConfigHolder#scaleOversizedMachineUis}.
+     */
+    @Override
+    public float getScale() {
+        float scale = super.getScale();
+        if (!com.gregtechceu.gtceu.GTCEu.isClientSide()) return scale;
+        var config = com.gregtechceu.gtceu.config.ConfigHolder.INSTANCE.client;
+        if (!config.scaleOversizedMachineUis) return scale;
+        var area = getArea();
+        if (area.w() <= 0 || area.h() <= 0) return scale;
+        var window = net.minecraft.client.Minecraft.getInstance().getWindow();
+        float fit = Math.min((window.getGuiScaledWidth() - 12f) / area.w(),
+                (window.getGuiScaledHeight() - 12f) / area.h());
+        if (fit >= 1f) return scale;
+        return scale * Math.max(fit, Math.max(0.2f, Math.min(1f, config.machineUiMinScale)));
+    }
 
     public MachineUIPanel(MetaMachine machine, PosGuiData data, UISettings settings, boolean attachPlayerInventory,
                           boolean addTitleBar, boolean drawGTLogo, UITexture gtLogoTexture) {
@@ -92,6 +117,7 @@ public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
                 })));
 
         Flow panelContents = Flow.col().coverChildren();
+        this.contentsColumn = panelContents;
         panelContents.margin(4);
         mainContents = new ParentWidget<>().coverChildren(DEFAULT_CONTENT_WIDTH, DEFAULT_CONTENT_HEIGHT);
 

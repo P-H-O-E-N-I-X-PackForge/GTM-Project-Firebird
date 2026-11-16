@@ -269,6 +269,28 @@ public class MultiblockControllerMachine extends MetaMachine {
         return getPatternState(DEFAULT_STRUCTURE);
     }
 
+    /**
+     * The structures whose errors the controller's UI reports while it is not formed. All of them by default; a
+     * multiblock whose structures are alternatives, such as tiers, can narrow it to the ones that are meant to be built.
+     */
+    public java.util.Collection<String> getErrorReportStructures() {
+        return getStructurePatterns().keySet();
+    }
+
+    /**
+     * The errors the controller's UI reports while it is not formed: those of {@link #getErrorReportStructures()} by
+     * default. Override to choose, order or add to them, for example to report only the closest of several alternative
+     * structures. Called on the server, whenever the UI checks for changes.
+     */
+    public java.util.List<com.gregtechceu.gtceu.api.multiblock.error.PatternError> getReportedPatternErrors() {
+        var list = new java.util.ArrayList<com.gregtechceu.gtceu.api.multiblock.error.PatternError>();
+        for (String name : getErrorReportStructures()) {
+            var state = getPatternState(name);
+            if (state != null) list.addAll(state.getErrors());
+        }
+        return list;
+    }
+
     public PatternState getPatternState(String name) {
         return this.patternStates.get(name);
     }
@@ -401,8 +423,10 @@ public class MultiblockControllerMachine extends MetaMachine {
     public void invalidateStructure(String name) {
         var pState = patternStates.get(name);
 
+        // only the default structure decides how the controller looks: another structure failing its check, as the
+        // alternatives of a multiblock usually do, must not make a formed controller look unformed
         MachineRenderState renderState = getRenderState();
-        if (renderState.hasProperty(GTMachineModelProperties.IS_FORMED)) {
+        if (name.equals(DEFAULT_STRUCTURE) && renderState.hasProperty(GTMachineModelProperties.IS_FORMED)) {
             setRenderState(renderState.setValue(GTMachineModelProperties.IS_FORMED, false));
         }
         parts.removeIf(part -> {

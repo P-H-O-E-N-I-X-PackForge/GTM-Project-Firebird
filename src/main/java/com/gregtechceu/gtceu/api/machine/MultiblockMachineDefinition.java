@@ -99,12 +99,19 @@ public class MultiblockMachineDefinition extends MachineDefinition {
         super(id, properties);
         this.generator = properties.generator;
 
-        Map<String, Supplier<IBlockPattern>> structurePatterns = new Object2ObjectOpenHashMap<>();
+        // in the order they were added, with the default one first: previews and menus list them in this order
+        Map<String, Supplier<IBlockPattern>> structurePatterns = new LinkedHashMap<>();
         if (properties.patterns().isEmpty()) {
             throw new IllegalStateException("Missing default structure pattern for " + getName());
         }
+        var defaultPattern = properties.patterns.get(MultiblockControllerMachine.DEFAULT_STRUCTURE);
+        if (defaultPattern != null) {
+            structurePatterns.put(MultiblockControllerMachine.DEFAULT_STRUCTURE,
+                    GTMemoizer.memoize(() -> defaultPattern.apply(this)));
+        }
         for (Map.Entry<String, Function<MultiblockMachineDefinition, IBlockPattern>> entry : properties.patterns
                 .entrySet()) {
+            if (entry.getKey().equals(MultiblockControllerMachine.DEFAULT_STRUCTURE)) continue;
             structurePatterns.put(entry.getKey(), GTMemoizer.memoize(() -> entry.getValue().apply(this)));
         }
         this.structurePatterns = Collections.unmodifiableMap(structurePatterns);
@@ -124,7 +131,7 @@ public class MultiblockMachineDefinition extends MachineDefinition {
     public static class Properties extends MachineDefinition.Properties {
 
         private boolean generator = false;
-        private final Map<String, Function<MultiblockMachineDefinition, IBlockPattern>> patterns = new Object2ReferenceOpenHashMap<>();
+        private final Map<String, Function<MultiblockMachineDefinition, IBlockPattern>> patterns = new java.util.LinkedHashMap<>();
         private boolean allowFlip = true;
         private final List<Supplier<ItemStack[]>> recoveryItems = new ArrayList<>();
         private Function<MultiblockControllerMachine, Comparator<MultiblockPartMachine>> partSorter = (c) -> (a,

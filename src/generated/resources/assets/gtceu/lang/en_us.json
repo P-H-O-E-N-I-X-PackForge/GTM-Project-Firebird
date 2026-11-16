@@ -3837,6 +3837,7 @@
   "gtceu.recipe.computation_per_tick": "Min. Computation: %s CWU/t",
   "gtceu.recipe.dimensions": "Dimensions: %s",
   "gtceu.recipe.duration": "Duration: %s secs",
+  "gtceu.recipe.duration.long": "Duration: %s",
   "gtceu.recipe.environmental_hazard": "§cArea must have %s",
   "gtceu.recipe.environmental_hazard.reverse": "§cArea must be free of %s",
   "gtceu.recipe.eu": "Usage: %s A @ %s",

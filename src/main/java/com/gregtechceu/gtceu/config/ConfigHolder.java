@@ -885,6 +885,24 @@ public class ConfigHolder {
         public float emiPageMinScale = 0.5f;
 
         @Configurable
+        @Configurable.Comment({
+                "Show recipe durations of a minute or more as months, days, hours, minutes and seconds on recipe pages,",
+                "instead of only seconds: '2 h 5 min 12 secs' and not '7512 secs'. A month is 30 days.",
+                "Default: false" })
+        public boolean recipeDurationHoursMinutes = false;
+        @Configurable
+        @Configurable.Comment({
+                "Shrink a machine's UI that is too big for the window, which happens at a high GUI scale or in a small",
+                "window, so it fits on the screen. Clicks and tooltips still work on it.",
+                "Default: true" })
+        public boolean scaleOversizedMachineUis = true;
+        @Configurable
+        @Configurable.Comment({ "How small a machine UI may be scaled down to, as a fraction of its size.",
+                "Default: 0.4" })
+        @Configurable.DecimalRange(min = 0.2, max = 1.0)
+        public float machineUiMinScale = 0.4f;
+
+        @Configurable
         @Configurable.Comment({ "Whether or not to display all temperatures in Celsius instead of Kelvin" })
         public boolean temperaturesInCelsius = false;
         @Configurable

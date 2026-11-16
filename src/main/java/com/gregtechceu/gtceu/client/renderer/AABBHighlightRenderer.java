@@ -48,6 +48,9 @@ public class AABBHighlightRenderer {
 
         long time = System.currentTimeMillis();
         highlights.forEach(h -> h.render(buffer, stack, time));
+        // The lines are only queued in the buffer so far; draw them now, while depth testing is off, or they are drawn
+        // later with it on and a highlight inside or behind a block is not seen.
+        bufferSource.endBatch(RenderType.lines());
 
         stack.popPose();
 
@@ -73,11 +76,12 @@ public class AABBHighlightRenderer {
             if (currentTimeMillis < startMillis) return;
             if ((currentTimeMillis - startMillis) / phaseMillis % 2 == 1) return;
 
+            // renderLineBox takes colors from 0 to 1; passing 0 to 255 made the alpha wrap round to almost nothing
             LevelRenderer.renderLineBox(poseStack, buffer, aabb,
-                    FastColor.ARGB32.red(colorARGB),
-                    FastColor.ARGB32.green(colorARGB),
-                    FastColor.ARGB32.blue(colorARGB),
-                    FastColor.ARGB32.alpha(colorARGB));
+                    FastColor.ARGB32.red(colorARGB) / 255f,
+                    FastColor.ARGB32.green(colorARGB) / 255f,
+                    FastColor.ARGB32.blue(colorARGB) / 255f,
+                    FastColor.ARGB32.alpha(colorARGB) / 255f);
         }
 
         public void remove() {

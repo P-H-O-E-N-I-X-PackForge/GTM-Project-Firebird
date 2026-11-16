@@ -40,9 +40,9 @@ public final class GTViewerParts {
         return column;
     }
 
-    /** The recipe's duration in seconds, as GT writes it. */
+    /** The recipe's duration, as GT writes it: in seconds, or hours and minutes too if the client config says so. */
     public static IWidget durationRow(int ticks) {
-        return Text.lang("gtceu.recipe.duration", ticks / 20.0).asWidget();
+        return Text.of(com.gregtechceu.gtceu.utils.FormattingUtil.formatRecipeDuration(ticks)).asWidget();
     }
 
     /** A voltage tier's short coloured name, for example the overclock tier. */

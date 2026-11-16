@@ -62,6 +62,12 @@ public class MachineUIPanelBuilder {
      * the machine supports them.
      */
     private boolean addDefaultConfigurators = true;
+    /**
+     * Whether a multiblock controller's UI reports why it has not formed, under its main contents, the way the
+     * standard multiblock UIs do. Standard multiblocks already do this in their main contents; this is for UIs that
+     * build their own.
+     */
+    private boolean showPatternErrors = false;
     private final MetaMachine machine;
 
     @Getter
@@ -113,6 +119,12 @@ public class MachineUIPanelBuilder {
         leftConfigurators.accept(attachLeft);
         rightConfigurators.accept(attachRight);
         mainContents.accept(attachMain);
+
+        if (showPatternErrors && machine instanceof com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine controller) {
+            // under the main contents, above the player inventory; the widget takes no room while there are no errors
+            panel.getContentsColumn().child(1,
+                    com.gregtechceu.gtceu.common.mui.GTMultiblockTextUtil.addUnformedWarning(controller, syncManager));
+        }
 
         if (addTraitConfigurators) {
             for (var attachConfiguratorsTrait : machine.getTraitHolder()
@@ -166,6 +178,15 @@ public class MachineUIPanelBuilder {
         }
 
         return panel;
+    }
+
+    /**
+     * Makes the panel report a multiblock controller's pattern errors under its main contents. See
+     * {@code MultiblockControllerMachine#getErrorReportStructures}.
+     */
+    public MachineUIPanelBuilder showPatternErrors() {
+        this.showPatternErrors = true;
+        return this;
     }
 
     public static MachineUIPanelBuilder panelBuilder(MetaMachine machine) {

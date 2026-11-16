@@ -949,6 +949,7 @@ public class LangHandler {
         provider.add("gtceu.recipe.eu_inverted", "Generation: %s A @ %s");
         provider.add("gtceu.recipe.eu.total", "%s EU/t");
         provider.add("gtceu.recipe.duration", "Duration: %s secs");
+        provider.add("gtceu.recipe.duration.long", "Duration: %s");
         provider.add("gtceu.recipe.voltage", "Usage: %s A @ %s");
         provider.add("gtceu.recipe.total_eu", "Total Usage: %s EU/t");
         provider.add("gtceu.recipe.not_consumed", "Does not get consumed in the process");

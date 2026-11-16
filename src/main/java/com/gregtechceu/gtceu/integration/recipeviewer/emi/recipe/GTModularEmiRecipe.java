@@ -106,8 +106,9 @@ public abstract class GTModularEmiRecipe extends ModularUIEmiRecipe {
         Minecraft mc = Minecraft.getInstance();
         // EMI lays recipes out when its screen opens, so it has to be told to do it again
         if (mc.screen instanceof RecipeScreen screen) {
-            mc.execute(
-                    () -> screen.resize(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+            // tell, not execute: execute runs the task at once when called from the render thread, and this is called
+            // while the screen is being drawn, so the screen would rebuild its page in the middle of drawing it
+            mc.tell(() -> screen.resize(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
         }
     }
 

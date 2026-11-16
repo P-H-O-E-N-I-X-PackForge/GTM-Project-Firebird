@@ -56,8 +56,11 @@ import brachy.modularui.widgets.dynamic.DynamicHandler;
 import brachy.modularui.widgets.dynamic.DynamicWidget;
 import brachy.modularui.widgets.layout.Flow;
 import brachy.modularui.widgets.menu.ContextMenuButton;
+import brachy.modularui.api.IPanelHandler;
 import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.widgets.menu.AbstractMenuButton;
 import brachy.modularui.widgets.menu.Menu;
+import brachy.modularui.widgets.menu.MenuPanel;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
 import com.mojang.blaze3d.platform.InputConstants;
 import it.unimi.dsi.fastutil.ints.*;
@@ -133,6 +136,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             case ALL, NON_Y_AXIS, NONE -> Direction.UP;
         };
         this.multiblockSchemaInfo = schemaInfo == null ? new MultiblockSchemaInfo(definition) : schemaInfo;
+        if (!terminal) restoreStructureChoice();
         refreshSchema();
 
         PreviewSchemaRenderer renderer = new PreviewSchemaRenderer(this.multiblockSchemaInfo.getMapSchema());
@@ -344,17 +348,18 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             applyFilters();
                             return true;
                         }))
+                .childIf(definition.getStructurePatterns().size() > 1, this::createStructuresButton)
                 .childIf(!variants.isEmpty(), this::createVariantsMenu)
                 .childIf(MultiblockPreviewExtensions.has(Slot.TOOLBAR, definition), () -> Flow.row()
                         .name("toolbar_extensions")
-                        .left(variants.isEmpty() ? 64 : 83)
+                        .left(64 + (variants.isEmpty() ? 0 : 19) +
+                                (definition.getStructurePatterns().size() > 1 ? 19 : 0))
                         .coverChildren()
                         .childPadding(1)
                         .children(MultiblockPreviewExtensions.build(Slot.TOOLBAR, this), w -> w))
                 .child(Flow.col()
                         .name("main")
                         .coverChildren()
-                        .childIf(definition.getStructurePatterns().size() > 1, this::createStructureRow)
                         .child(new DynamicWidget<>()
                                 .name("structure_patterns")
                                 .widthRel(1f)
@@ -582,6 +587,27 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
 
     // *** Structures ***
 
+    private record StructureChoice(String structure, List<String> overlays) {}
+
+    private static final Map<net.minecraft.resources.ResourceLocation, StructureChoice> CHOICES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The recipe viewers build the page again when it is scrolled or its tab is changed, so the structure picked in a
+     * viewer page is kept per multiblock, for the rest of the session. The terminal keeps its choice on the item.
+     */
+    private void rememberStructureChoice() {
+        if (terminal) return;
+        CHOICES.put(multiblockDefinition.getId(),
+                new StructureChoice(multiblockSchemaInfo.getStructure(), multiblockSchemaInfo.getOverlays()));
+    }
+
+    private void restoreStructureChoice() {
+        StructureChoice choice = CHOICES.get(multiblockDefinition.getId());
+        if (choice == null) return;
+        multiblockSchemaInfo.selectStructure(choice.structure());
+        for (String name : choice.overlays()) multiblockSchemaInfo.setOverlay(name, true);
+    }
+
     /** The name of the structure being shown, see {@code MultiblockMachineBuilder#pattern}. */
     public String getStructure() {
         return multiblockSchemaInfo.getStructure();
@@ -591,6 +617,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     public void setStructure(String name) {
         if (name.equals(getStructure())) return;
         multiblockSchemaInfo.selectStructure(name);
+        rememberStructureChoice();
         selectionInfo = SelectionInfo.empty();
         yLevel = Integer.MAX_VALUE;
         selectedBlockHandler.notifyUpdate();
@@ -606,34 +633,67 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     public void setOverlay(String name, boolean on) {
         if (multiblockSchemaInfo.isOverlay(name) == on) return;
         multiblockSchemaInfo.setOverlay(name, on);
+        rememberStructureChoice();
         applyFilters();
     }
 
+    private @Nullable IPanelHandler structuresPanel;
+
     /**
-     * A row of buttons, one for each structure, under the toolbar: the name shows that structure and the plus beside it
-     * shows it on top of the selected one. It is not a menu, since the buttons of a menu are drawn without their state
-     * and a click on them can close it.
+     * The toolbar's S button, which opens a small panel to choose the structure from. The panel is made the way the
+     * auto-output side menu is, which is known to take clicks, and not with {@code ContextMenuButton}, whose list
+     * menu is as wide as its button.
      */
-    private Flow createStructureRow() {
+    private ButtonWidget<?> createStructuresButton() {
+        ButtonWidget<?> button = new ButtonWidget<>();
+        button.size(16)
+                .left(64)
+                .overlay(Text.str("S").asIcon())
+                .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structures")))
+                .onMousePressed((context, mouse) -> {
+                    if (structuresPanel == null) {
+                        structuresPanel = IPanelHandler.simple(button.getPanel(), (parent, player) -> {
+                            Menu<?> menu = buildStructureMenu();
+                            menu.resizer().relative(button);
+                            AbstractMenuButton.Direction.RIGHT_DOWN.apply(menu);
+                            return new MenuPanel("structures", menu);
+                        }, true);
+                    }
+                    if (structuresPanel.isPanelOpen()) structuresPanel.closePanel();
+                    else structuresPanel.openPanel();
+                    return true;
+                });
+        return button;
+    }
+
+    /**
+     * The structures to choose from, one to a line: the name shows that structure, the plus beside it shows it on top
+     * of the selected one.
+     */
+    private Menu<?> buildStructureMenu() {
         var font = Minecraft.getInstance().font;
-        Flow row = Flow.row().name("structures").coverChildren().childPadding(3).margin(0, 1);
+        int nameWidth = 30;
         for (String name : multiblockDefinition.getStructurePatterns().keySet()) {
-            row.child(Flow.row().coverChildren().childPadding(1)
-                    .child(new ToggleButton()
-                            .size(font.width(name) + 8, 14)
+            nameWidth = Math.max(nameWidth, font.width(name) + 8);
+        }
+        Flow column = Flow.col().coverChildren().childPadding(2);
+        for (String name : multiblockDefinition.getStructurePatterns().keySet()) {
+            column.child(Flow.row().coverChildren().childPadding(2)
+                    .child(com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerParts.unique(new ToggleButton()
+                            .size(nameWidth, 14)
                             .value(new BoolValue.Dynamic(() -> name.equals(getStructure()), shown -> {
                                 if (shown) setStructure(name);
                             }))
                             .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structure_show")))
-                            .overlay(Text.str(name).asIcon().size(font.width(name) + 2, 8)))
-                    .child(new ToggleButton()
+                            .overlay(Text.str(name).asIcon().size(font.width(name) + 2, 8))))
+                    .child(com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerParts.unique(new ToggleButton()
                             .size(14, 14)
                             .value(new BoolValue.Dynamic(() -> multiblockSchemaInfo.isOverlay(name),
                                     on -> setOverlay(name, on)))
                             .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structure_overlay")))
-                            .overlay(Text.str("+").asIcon().size(font.width("+") + 2, 8))));
+                            .overlay(Text.str("+").asIcon().size(font.width("+") + 2, 8)))));
         }
-        return row;
+        return new Menu<>().coverChildren().padding(2).child(column);
     }
 
     /**
@@ -697,7 +757,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     private ContextMenuButton<?> createVariantsMenu() {
         return new ContextMenuButton<>("variants")
                 .size(16)
-                .left(64)
+                .left(multiblockDefinition.getStructurePatterns().size() > 1 ? 83 : 64)
                 .overlay(Text.str("V").asIcon())
                 .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.variants")))
                 .requiresClick()
