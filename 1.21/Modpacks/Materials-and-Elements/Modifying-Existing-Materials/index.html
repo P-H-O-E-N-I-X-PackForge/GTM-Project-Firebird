@@ -1379,6 +1379,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modifying Existing Materials
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -1395,6 +1413,47 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-property-a-material-already-has" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing a property a material already has
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-fluids-a-material-already-has" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing the fluids a material already has
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -2815,6 +2874,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2943,6 +3006,62 @@
     
   
     Custom Recipe Type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Examples/Custom-Viewer-Pages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Recipe Viewer Pages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Examples/Hiding-Recipes-In-Viewers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hiding Recipes in the Recipe Viewers
   
 
     
@@ -3100,10 +3219,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -3121,8 +3240,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4807,6 +4926,36 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-property-a-material-already-has" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing a property a material already has
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-fluids-a-material-already-has" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing the fluids a material already has
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -4985,6 +5134,71 @@ The kjs <code>GTCEuStartupEvents.materialModification</code> event will always f
 <ol>
 <li>Most methods in the <a href="https://github.com/GregTechCEu/GregTech-Modern/blob/1.20.1/src/main/java/com/gregtechceu/gtceu/api/data/chemical/material/Material.java"><code>Material</code> class</a> can be used in the <code>PostMaterialEvent</code>/<code>materialModification</code> event</li>
 </ol>
+<h2 id="changing-a-property-a-material-already-has">Changing a property a material already has</h2>
+<p><code>setProperty</code> only adds: it throws if the material already has that property. To change one that is there, use
+<code>modifyProperty</code> to edit it in place, or <code>replaceProperty</code> to swap in a new one. Both also work for a property the
+material does not have yet; <code>modifyProperty</code> starts from a default one.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="7:2"><input checked="checked" id="__tabbed_7_1" name="__tabbed_7" type="radio" /><input id="__tabbed_7_2" name="__tabbed_7" type="radio" /><div class="tabbed-labels"><label for="__tabbed_7_1">Java</label><label for="__tabbed_7_2">JavaScript</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">AddonMod.java</span><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nd">@SubscribeEvent</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">materialModification</span><span class="p">(</span><span class="n">PostMaterialEvent</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="c1">// Edit the tool property in place</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="n">GTMaterials</span><span class="p">.</span><span class="na">Iron</span><span class="p">.</span><span class="na">modifyProperty</span><span class="p">(</span><span class="n">PropertyKey</span><span class="p">.</span><span class="na">TOOL</span><span class="p">,</span><span class="w"> </span><span class="n">tool</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">        </span><span class="n">tool</span><span class="p">.</span><span class="na">setDurability</span><span class="p">(</span><span class="mi">2000</span><span class="p">);</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">        </span><span class="n">tool</span><span class="p">.</span><span class="na">setHarvestLevel</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="p">});</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="c1">// Or replace it with a new one</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="n">GTMaterials</span><span class="p">.</span><span class="na">Copper</span><span class="p">.</span><span class="na">replaceProperty</span><span class="p">(</span><span class="n">PropertyKey</span><span class="p">.</span><span class="na">TOOL</span><span class="p">,</span><span class="w"> </span><span class="n">ToolProperty</span><span class="p">.</span><span class="na">Builder</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="mf">6.0F</span><span class="p">,</span><span class="w"> </span><span class="mf">3.0F</span><span class="p">,</span><span class="w"> </span><span class="mi">600</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">).</span><span class="na">build</span><span class="p">());</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">}</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">tool_property.js</span><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">materialModification</span><span class="p">(</span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="c1">// Edit the tool property in place</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nx">GTMaterials</span><span class="p">.</span><span class="nx">Iron</span><span class="p">.</span><span class="nx">modifyProperty</span><span class="p">(</span><span class="nx">PropertyKey</span><span class="p">.</span><span class="nx">TOOL</span><span class="p">,</span><span class="w"> </span><span class="nx">tool</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">        </span><span class="nx">tool</span><span class="p">.</span><span class="nx">setDurability</span><span class="p">(</span><span class="mf">2000</span><span class="p">)</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">        </span><span class="nx">tool</span><span class="p">.</span><span class="nx">setHarvestLevel</span><span class="p">(</span><span class="mf">3</span><span class="p">)</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="p">})</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="c1">// Or replace it with a new one</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="nx">GTMaterials</span><span class="p">.</span><span class="nx">Copper</span><span class="p">.</span><span class="nx">replaceProperty</span><span class="p">(</span><span class="nx">PropertyKey</span><span class="p">.</span><span class="nx">TOOL</span><span class="p">,</span><span class="w"> </span><span class="nx">ToolProperty</span><span class="p">.</span><span class="nx">Builder</span><span class="p">.</span><span class="k">of</span><span class="p">(</span><span class="mf">6</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="mf">600</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">).</span><span class="nx">build</span><span class="p">())</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="p">})</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="changing-the-fluids-a-material-already-has">Changing the fluids a material already has</h2>
+<p><code>modifyFluid</code> changes how one of the material's fluids will be built. It works for any <code>FluidBuilder</code> option, for
+example the textures, and has to be done in the same event, before the fluids are registered.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="8:2"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio" /><input id="__tabbed_8_2" name="__tabbed_8" type="radio" /><div class="tabbed-labels"><label for="__tabbed_8_1">Java</label><label for="__tabbed_8_2">JavaScript</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">AddonMod.java</span><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nd">@SubscribeEvent</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">materialModification</span><span class="p">(</span><span class="n">PostMaterialEvent</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="c1">// Textures of your own, from any namespace. The last value is whether the fluid's color tints them.</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="n">GTMaterials</span><span class="p">.</span><span class="na">Iron</span><span class="p">.</span><span class="na">modifyFluid</span><span class="p">(</span><span class="n">FluidStorageKeys</span><span class="p">.</span><span class="na">LIQUID</span><span class="p">,</span><span class="w"> </span><span class="n">fluid</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fluid</span><span class="p">.</span><span class="na">textures</span><span class="p">(</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">            </span><span class="n">ResourceLocation</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">"mymod:block/fluids/iron_still"</span><span class="p">),</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">            </span><span class="n">ResourceLocation</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">"mymod:block/fluids/iron_flow"</span><span class="p">),</span><span class="w"> </span><span class="kc">false</span><span class="p">));</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="c1">// Or a fluid icon set, see the Icon Sets page</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">    </span><span class="n">GTMaterials</span><span class="p">.</span><span class="na">Copper</span><span class="p">.</span><span class="na">modifyFluid</span><span class="p">(</span><span class="n">FluidStorageKeys</span><span class="p">.</span><span class="na">LIQUID</span><span class="p">,</span><span class="w"> </span><span class="n">fluid</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fluid</span><span class="p">.</span><span class="na">iconSet</span><span class="p">(</span><span class="n">MaterialIconSet</span><span class="p">.</span><span class="na">LAVA</span><span class="p">));</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="p">}</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">fluid_textures.js</span><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">materialModification</span><span class="p">(</span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span><span class="nx">GTMaterials</span><span class="p">.</span><span class="nx">Iron</span><span class="p">.</span><span class="nx">modifyFluid</span><span class="p">(</span><span class="nx">GTFluidStorageKeys</span><span class="p">.</span><span class="nx">LIQUID</span><span class="p">,</span><span class="w"> </span><span class="nx">fluid</span><span class="w"> </span><span class="p">=&gt;</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">        </span><span class="nx">fluid</span><span class="p">.</span><span class="nx">textures</span><span class="p">(</span><span class="s1">'kubejs:block/fluids/iron_still'</span><span class="p">,</span><span class="w"> </span><span class="s1">'kubejs:block/fluids/iron_flow'</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">))</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="nx">GTMaterials</span><span class="p">.</span><span class="nx">Copper</span><span class="p">.</span><span class="nx">modifyFluid</span><span class="p">(</span><span class="nx">GTFluidStorageKeys</span><span class="p">.</span><span class="nx">LIQUID</span><span class="p">,</span><span class="w"> </span><span class="nx">fluid</span><span class="w"> </span><span class="p">=&gt;</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">        </span><span class="nx">fluid</span><span class="p">.</span><span class="nx">iconSet</span><span class="p">(</span><span class="nx">GTMaterialIconSet</span><span class="p">.</span><span class="nx">LAVA</span><span class="p">))</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="p">})</span>
+</code></pre></div>
+</div>
+</div>
+</div>
 
 
 

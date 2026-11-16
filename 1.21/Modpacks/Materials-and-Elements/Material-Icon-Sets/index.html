@@ -1395,6 +1395,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#fluid-icon-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluid Icon Sets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fluid Icon Sets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#textures-for-a-custom-icon-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Textures for a custom icon set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2874,6 +2902,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -3002,6 +3034,62 @@
     
   
     Custom Recipe Type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Examples/Custom-Viewer-Pages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Recipe Viewer Pages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Examples/Hiding-Recipes-In-Viewers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hiding Recipes in the Recipe Viewers
   
 
     
@@ -3159,10 +3247,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -3180,8 +3268,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4894,6 +4982,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#fluid-icon-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluid Icon Sets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fluid Icon Sets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#textures-for-a-custom-icon-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Textures for a custom icon set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4963,12 +5079,73 @@
 <div class="tabbed-block">
 <div class="highlight"><span class="filename">custom_iconsets.js</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">registry</span><span class="p">(</span><span class="s1">'gtceu:material_icon_set'</span><span class="p">,</span><span class="w"> </span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nx">event</span><span class="p">.</span><span class="nx">create</span><span class="p">(</span><span class="s1">'starry'</span><span class="p">)</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="p">.</span><span class="nx">parent</span><span class="p">(</span><span class="s1">'shiny'</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="p">.</span><span class="nx">parentIconset</span><span class="p">(</span><span class="s1">'gtceu:shiny'</span><span class="p">)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">})</span>
 </code></pre></div>
 </div>
 </div>
 </div>
+<h2 id="fluid-icon-sets">Fluid Icon Sets</h2>
+<p>A fluid's liquid can take its textures from an icon set of its own, instead of the one its material uses for its
+items. An icon set gets fluid textures by registering them with the <code>FluidBuilder</code>. Two come with textures:</p>
+<ul>
+<li><code>GTMaterialIconSet.WATER</code> uses vanilla's water textures, tinted by the fluid's color.</li>
+<li><code>GTMaterialIconSet.LAVA</code> uses vanilla's lava textures, which are not tinted.</li>
+</ul>
+<p>Give a fluid an icon set when you create it, or later with <code>modifyFluid</code>:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Java</label><label for="__tabbed_2_2">JavaScript</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">AddonMaterials.java</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// when creating the material</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="p">.</span><span class="na">liquid</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">FluidBuilder</span><span class="p">().</span><span class="na">iconSet</span><span class="p">(</span><span class="n">MaterialIconSet</span><span class="p">.</span><span class="na">LAVA</span><span class="p">))</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">// tinted with your own color; a color you set always tints it</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">.</span><span class="na">liquid</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">FluidBuilder</span><span class="p">().</span><span class="na">iconSet</span><span class="p">(</span><span class="n">MaterialIconSet</span><span class="p">.</span><span class="na">WATER</span><span class="p">).</span><span class="na">color</span><span class="p">(</span><span class="mh">0x44AA88</span><span class="p">))</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">materials.js</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">registry</span><span class="p">(</span><span class="s1">'gtceu:material'</span><span class="p">,</span><span class="w"> </span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nx">event</span><span class="p">.</span><span class="nx">create</span><span class="p">(</span><span class="s1">'ember_fluid'</span><span class="p">)</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">        </span><span class="p">.</span><span class="nx">liquid</span><span class="p">(</span><span class="ow">new</span><span class="w"> </span><span class="nx">GTFluidBuilder</span><span class="p">().</span><span class="nx">iconSet</span><span class="p">(</span><span class="nx">GTMaterialIconSet</span><span class="p">.</span><span class="nx">LAVA</span><span class="p">))</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">})</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>Only the liquid takes the icon set's textures; gases and plasmas keep using the material's icon set paths.</p>
+<h3 id="textures-for-a-custom-icon-set">Textures for a custom icon set</h3>
+<p>After registering an icon set, register its fluid textures. They can be any texture in the block atlas, from any mod.
+The last value says whether the fluid's color tints them: <code>true</code> for a gray texture that should take the color, <code>false</code>
+for one that already has its colors. A flowing texture is normally twice as wide as the still one.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Java</label><label for="__tabbed_3_2">JavaScript</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">AddonIconSets.java</span><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Holder</span><span class="o">&lt;</span><span class="n">MaterialIconSet</span><span class="o">&gt;</span><span class="w"> </span><span class="n">EMBER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ADDON_REGISTRATE</span><span class="p">.</span><span class="na">materialIconSet</span><span class="p">(</span><span class="s">"ember"</span><span class="p">,</span><span class="w"> </span><span class="n">MaterialIconSet</span><span class="p">.</span><span class="na">FLUID</span><span class="p">);</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// in your mod's constructor, before the fluids are built</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">FluidBuilder</span><span class="p">.</span><span class="na">registerIconSetTextures</span><span class="p">(</span><span class="n">ResourceLocation</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">"mymod:ember"</span><span class="p">),</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="n">ResourceLocation</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">"mymod:block/fluids/ember_still"</span><span class="p">),</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">        </span><span class="n">ResourceLocation</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">"mymod:block/fluids/ember_flow"</span><span class="p">),</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">fluid_iconsets.js</span><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">registry</span><span class="p">(</span><span class="s1">'gtceu:material_icon_set'</span><span class="p">,</span><span class="w"> </span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nx">event</span><span class="p">.</span><span class="nx">create</span><span class="p">(</span><span class="s1">'ember'</span><span class="p">).</span><span class="nx">parentIconset</span><span class="p">(</span><span class="s1">'gtceu:fluid'</span><span class="p">)</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="p">})</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">// a startup script</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nx">GTFluidBuilder</span><span class="p">.</span><span class="nx">registerIconSetTextures</span><span class="p">(</span><span class="s1">'gtceu:ember'</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="s1">'kubejs:block/fluids/ember_still'</span><span class="p">,</span><span class="w"> </span><span class="s1">'kubejs:block/fluids/ember_flow'</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nx">GTCEuStartupEvents</span><span class="p">.</span><span class="nx">materialModification</span><span class="p">(</span><span class="nx">event</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="c1">// a set registered from a script is given by its id; scripts register icon sets under `gtceu`</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nx">GTMaterials</span><span class="p">.</span><span class="nx">Iron</span><span class="p">.</span><span class="nx">modifyFluid</span><span class="p">(</span><span class="nx">GTFluidStorageKeys</span><span class="p">.</span><span class="nx">LIQUID</span><span class="p">,</span><span class="w"> </span><span class="nx">fluid</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">fluid</span><span class="p">.</span><span class="nx">iconSetId</span><span class="p">(</span><span class="s1">'gtceu:ember'</span><span class="p">))</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="p">})</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>Registering textures for an icon set GT already has, such as <code>gtceu:metallic</code>, changes the liquid of every material that
+uses it or one of its child sets. To retexture one fluid, use <code>modifyFluid</code> with <code>textures(...)</code> instead.</p>
 
 
 
