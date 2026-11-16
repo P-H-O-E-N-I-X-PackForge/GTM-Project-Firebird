@@ -886,8 +886,8 @@ public class ConfigHolder {
 
         @Configurable
         @Configurable.Comment({
-                "Show recipe durations of a minute or more as months, days, hours, minutes and seconds on recipe pages,",
-                "instead of only seconds: '2 h 5 min 12 secs' and not '7512 secs'. A month is 30 days.",
+                "Show recipe durations of a minute or more as mm:dd:hh:mm:ss on recipe pages (months, days, hours,",
+                "minutes, seconds; a month is 30 days) instead of only seconds: '00:00:02:05:12' and not '7512 secs'.",
                 "Default: false" })
         public boolean recipeDurationHoursMinutes = false;
         @Configurable

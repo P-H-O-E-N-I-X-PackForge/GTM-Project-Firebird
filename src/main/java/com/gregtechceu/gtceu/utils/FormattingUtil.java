@@ -249,33 +249,26 @@ public class FormattingUtil {
         return formatNumberReadable(mB, true, DECIMAL_FORMAT_2F, "B");
     }
 
+    private static final long MONTH_SECONDS = 30L * 86400;
+
     /**
-     * A recipe's duration as it is shown on recipe pages: "Duration: 90 secs", or with the long format on in the client
-     * config, "Duration: 1 min 30 secs", "Duration: 2 h 5 min 12 secs" and, for the very long, days and months, a month
-     * being 30 days.
+     * A recipe's duration as it is shown on recipe pages: "Duration: 90 secs", or, with the long format on in the
+     * client config and a duration of a minute or more, "Duration: 00:00:00:01:30" in the form
+     * {@code mm:dd:hh:mm:ss}: months, days, hours, minutes and seconds, a month being 30 days.
      *
      * @param ticks the duration, in ticks
      */
-    private static final long MONTH_SECONDS = 30L * 86400;
-
     public static Component formatRecipeDuration(double ticks) {
         double seconds = ticks / 20;
         if (!ConfigHolder.INSTANCE.client.recipeDurationHoursMinutes || seconds < 60) {
             return Component.translatable("gtceu.recipe.duration", formatNumbers(seconds));
         }
         long whole = (long) seconds;
-        long months = whole / MONTH_SECONDS;
-        long days = (whole % MONTH_SECONDS) / 86400;
-        long hours = (whole % 86400) / 3600;
-        long minutes = (whole % 3600) / 60;
         double rest = seconds - (whole - whole % 60);
-        StringBuilder text = new StringBuilder();
-        if (months > 0) text.append(months).append(months == 1 ? " month " : " months ");
-        if (days > 0) text.append(days).append(days == 1 ? " day " : " days ");
-        if (hours > 0) text.append(hours).append(" h ");
-        if (minutes > 0) text.append(minutes).append(" min ");
-        if (rest >= 0.005) text.append(formatNumbers(rest)).append(" secs");
-        return Component.translatable("gtceu.recipe.duration.long", text.toString().trim());
+        String secondsText = formatNumbers(rest);
+        String text = String.format("%02d:%02d:%02d:%02d:", whole / MONTH_SECONDS, (whole % MONTH_SECONDS) / 86400,
+                (whole % 86400) / 3600, (whole % 3600) / 60) + (rest < 10 ? "0" + secondsText : secondsText);
+        return Component.translatable("gtceu.recipe.duration.long", text);
     }
 
     public static String formatTime(long ticks) {
