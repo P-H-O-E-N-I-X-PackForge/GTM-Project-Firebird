@@ -116,6 +116,16 @@ public class MaterialRegistryEntry extends RegistryEntry<Material, Material> {
         value().setProperty(key, property);
     }
 
+    /** @see Material#addFlags */
+    public void addFlags(com.gregtechceu.gtceu.api.data.chemical.material.info.MaterialFlag... flags) {
+        value().addFlags(flags);
+    }
+
+    /** @see Material#removeFlags */
+    public void removeFlags(com.gregtechceu.gtceu.api.data.chemical.material.info.MaterialFlag... flags) {
+        value().removeFlags(flags);
+    }
+
     /** @see Material#replaceProperty */
     public <T extends IMaterialProperty> void replaceProperty(PropertyKey<T> key, T property) {
         value().replaceProperty(key, property);

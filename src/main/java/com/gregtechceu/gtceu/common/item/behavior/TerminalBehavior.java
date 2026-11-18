@@ -1,5 +1,6 @@
 package com.gregtechceu.gtceu.common.item.behavior;
 
+import com.gregtechceu.gtceu.GTCEu;
 import com.gregtechceu.gtceu.api.item.component.IAddInformation;
 import com.gregtechceu.gtceu.api.item.component.IInteractionItem;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
@@ -17,6 +18,7 @@ import com.gregtechceu.gtceu.api.multiblock.util.BlockInfo;
 import com.gregtechceu.gtceu.common.data.item.GTDataComponents;
 import com.gregtechceu.gtceu.common.network.packets.CPacketTerminalSettings;
 import com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewWidget;
+import com.gregtechceu.gtceu.utils.GTUtil;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -51,6 +53,7 @@ import brachy.modularui.value.sync.PanelSyncManager;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.ints.*;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
@@ -86,7 +89,15 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                 defaultSchemaInfo(info);
         String structure = chosen.getStructure();
         PatternState state = controller.getPatternState(structure);
-        if (state == null || state.isFormed()) {
+        if (state == null) {
+            return InteractionResult.PASS;
+        }
+        // nothing to build when the structure and everything layered on it are formed
+        boolean everythingFormed = state.isFormed();
+        for (String overlay : chosen.getOverlays()) {
+            everythingFormed &= controller.isStructureFormed(overlay);
+        }
+        if (everythingFormed) {
             return InteractionResult.PASS;
         }
 
@@ -130,6 +141,8 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                         schemaInfo.getUserGlobalBlockPreferences(), frontFacing,
                         upFacing,
                         flipped);
+                // the structures layered on the selected one are built with it
+                schemaInfo.addOverlays(resultStructure, frontFacing, upFacing, flipped);
             }
 
             // Extract controller block offset
@@ -287,13 +300,82 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                     info.pos().getX(), info.pos().getY(), info.pos().getZ())
                     .withStyle(ChatFormatting.GOLD));
             tooltipComponents.add(info.definition().getBlock().getName());
+            addSettingsTooltip(stack, info, tooltipComponents);
         }
 
-        GlobalPos aeBinding = stack.get(AEComponents.WIRELESS_LINK_TARGET);
+        GlobalPos aeBinding = null;
+        if (GTCEu.Mods.isAE2Loaded()) {
+            aeBinding = AE2CallWrapper.getAEBinding(stack);
+        }
+
         if (aeBinding != null) {
             tooltipComponents.add(Component.translatable("gtceu.terminal.network_bound", aeBinding.dimension(),
                     aeBinding.pos().getX(), aeBinding.pos().getY(), aeBinding.pos().getZ())
                     .withStyle(ChatFormatting.GOLD));
+        }
+    }
+
+    /** What the terminal will do: how it shows and builds the multiblock, as the player has set it in the preview. */
+    private static void addSettingsTooltip(ItemStack stack, ControllerInfo info, List<Component> tooltip) {
+        MultiblockSchemaInfo schema = stack.get(GTDataComponents.MULTI_SCHEMA_INFO);
+        boolean flipped = schema != null ? schema.isFlipped() : info.flipped();
+
+        if (schema != null && !DEFAULT_STRUCTURE.equals(schema.getStructure())) {
+            tooltip.add(Component.translatable("gtceu.terminal.tooltip.structure", schema.getStructure())
+                    .withStyle(ChatFormatting.GRAY));
+        }
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.flipped", stateName(flipped))
+                .withStyle(ChatFormatting.GRAY));
+
+        // the layers: how often each repeatable section is built, the minimum where it was not set
+        Component layers;
+        if (schema == null || schema.getUserSliceRepeats().isEmpty()) {
+            layers = Component.translatable("gtceu.terminal.tooltip.layers.minimum");
+        } else {
+            StringJoiner joined = new StringJoiner(", ");
+            for (int count : schema.getUserSliceRepeats().values()) joined.add(String.valueOf(count));
+            layers = Component.literal(joined.toString());
+        }
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.layers", layers).withStyle(ChatFormatting.GRAY));
+
+        // the variant: the blocks the player picked in place of the multiblock's own
+        Component variant;
+        if (schema == null || schema.getUserGlobalBlockPreferences().isEmpty()) {
+            variant = Component.translatable("gtceu.terminal.tooltip.variant.default");
+        } else {
+            Map<Block, Integer> picked = new LinkedHashMap<>();
+            for (var preference : schema.getUserGlobalBlockPreferences().values()) {
+                picked.merge(preference.getBlockState().getBlock(), 1, Integer::sum);
+            }
+            var joined = Component.empty();
+            boolean first = true;
+            for (var entry : picked.entrySet()) {
+                if (!first) joined.append(", ");
+                joined.append(entry.getKey().getName());
+                first = false;
+            }
+            variant = joined;
+        }
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.variant", variant).withStyle(ChatFormatting.GRAY));
+
+        if (GTUtil.isShiftDown()) {
+            tooltip.add(Component.translatable("gtceu.terminal.help.load").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("gtceu.terminal.help.preview").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("gtceu.terminal.help.build").withStyle(ChatFormatting.DARK_GRAY));
+        } else {
+            tooltip.add(
+                    Component.translatable("gtceu.terminal.tooltip.hold_shift").withStyle(ChatFormatting.DARK_GRAY));
+        }
+    }
+
+    private static Component stateName(boolean enabled) {
+        return Component.translatable(enabled ? "gtceu.terminal.tooltip.yes" : "gtceu.terminal.tooltip.no");
+    }
+
+    public static class AE2CallWrapper {
+
+        static @Nullable GlobalPos getAEBinding(ItemStack stack) {
+            return stack.get(AEComponents.WIRELESS_LINK_TARGET);
         }
     }
 

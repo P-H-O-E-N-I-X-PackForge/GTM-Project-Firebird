@@ -95,7 +95,8 @@ public class ConveyorCover extends CoverBehavior implements IIOCover, IMuiCover,
                          int maxTransferRate) {
         super(definition, coverHolder, attachedSide);
         this.tier = tier;
-        this.maxItemTransferRate = maxTransferRate;
+        this.maxItemTransferRate = com.gregtechceu.gtceu.api.cover.CoverTransferRates
+                .apply(com.gregtechceu.gtceu.api.cover.CoverTransferRates.Kind.ITEM, tier, maxTransferRate);
         this.transferRate = maxItemTransferRate;
         this.itemsLeftToTransferLastSecond = transferRate;
         this.io = IO.OUT;

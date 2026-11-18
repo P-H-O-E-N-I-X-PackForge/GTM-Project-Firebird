@@ -131,6 +131,9 @@ public class CommonProxy {
             // initialize this before the class's static listeners
             // so KubeJS materials are registered before the material registry is closed.
             modBus.register(KubeGTRegistryEventHandler.class);
+            // pass GT's game bus events on to scripts
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS
+                    .register(com.gregtechceu.gtceu.integration.kjs.GTKubeEventBridge.class);
         }
         modBus.register(CommonProxy.class);
 

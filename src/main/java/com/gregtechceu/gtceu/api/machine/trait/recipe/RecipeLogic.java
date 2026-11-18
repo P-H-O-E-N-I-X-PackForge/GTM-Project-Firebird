@@ -485,11 +485,25 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
             duration = runningRecipe.duration;
             isActive = true;
             syncDataHolder.resyncAllFields();
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
+                    new com.gregtechceu.gtceu.api.events.MachineRecipeStartedEvent(getRLMachine(), runningRecipe));
         } else {
             lastRecipe = null;
             lastUnrolledRecipe = null;
             syncDataHolder.markClientSyncFieldDirty("lastUnrolledRecipe");
         }
+    }
+
+    /**
+     * For the multiblock preview, which shows a machine as working without a recipe running: the status is set
+     * directly, as {@link #setStatus} does nothing on the client, and halfway through a recipe, for the renders that
+     * show the progress.
+     */
+    public void showWorkingForPreview() {
+        this.status = Status.WORKING;
+        this.isActive = true;
+        this.duration = 200;
+        this.progress = 100;
     }
 
     public void setStatus(Status status) {
@@ -503,7 +517,10 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
                 suspendAfterFinish = false;
             }
             getRLMachine().recipeLogicStatusChanged(this.status, status);
+            Status previous = this.status;
             this.status = status;
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
+                    new com.gregtechceu.gtceu.api.events.MachineRecipeStatusEvent(getRLMachine(), previous, status));
             syncDataHolder.markClientSyncFieldDirty("status");
             setRenderState(getRenderState().setValue(GTMachineModelProperties.RECIPE_LOGIC_STATUS, status));
             updateTickSubscription();

@@ -56,6 +56,20 @@ public class MultiblockMachineBuilder<MACHINE extends MultiblockControllerMachin
         return getThis();
     }
 
+    /**
+     * Adds a structure that is built on top of the main one instead of in its place, such as an optional extension. The
+     * pattern is anchored on the controller like any other and only has to check the blocks it adds; everything else
+     * can be left to {@code Predicates.any()}. Previews show it with the main structure and the terminal builds it with
+     * it. See {@link com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind#ADDITION}.
+     */
+    public MultiblockMachineBuilder<MACHINE> additionalPattern(String structureName,
+                                                               Function<MultiblockMachineDefinition, IBlockPattern> pattern) {
+        getProperties().patterns().put(structureName, pattern);
+        getProperties().kinds().put(structureName,
+                com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind.ADDITION);
+        return getThis();
+    }
+
     public MultiblockMachineBuilder<MACHINE> allowFlip(boolean allowFlip) {
         getProperties().allowFlip(allowFlip);
         return getThis();

@@ -137,21 +137,22 @@ public class GregTechKubeJSPlugin implements KubeJSPlugin {
                 GTRecipeCategoryBuilderJS::new);
 
         registry.of(GTRegistries.Keys.MACHINE, reg -> {
-            reg.addDefault(KJSWrappingMachineBuilder.class,
-                    (id) -> new KJSWrappingMachineBuilder(id,
-                            new KJSTieredMachineBuilder(id, SimpleTieredMachine::new, false)));
 
-            reg.add(GTCEu.id("custom"), KJSWrappingMachineBuilder.class,
-                    (id) -> new KJSWrappingMachineBuilder(id, new KJSTieredMachineBuilder(id)));
+            reg.addDefault(KJSTieredMachineBuilder.class,
+                    (id) -> new KJSTieredMachineBuilder(id, SimpleTieredMachine::new, false));
+            reg.add(GTCEu.id("custom"), KJSTieredMachineBuilder.class,
+                    KJSTieredMachineBuilder::new);
+
             reg.add(GTCEu.id("steam"), KJSSteamMachineBuilder.class, KJSSteamMachineBuilder::new);
-            reg.add(GTCEu.id("generator"), KJSWrappingMachineBuilder.class,
-                    (id) -> new KJSWrappingMachineBuilder(id,
-                            new KJSTieredMachineBuilder(id, SimpleGeneratorMachine::new, true)));
+            reg.add(GTCEu.id("generator"), KJSTieredMachineBuilder.class,
+                    (id) -> new KJSTieredMachineBuilder(id, SimpleGeneratorMachine::new, true));
 
             reg.add(GTCEu.id("multiblock"), MultiblockMachineBuilderJS.class,
                     MultiblockMachineBuilderJS::createKJSMulti);
-            reg.add(GTCEu.id("tiered_multiblock"), KJSWrappingMultiblockBuilder.class,
-                    KJSWrappingMultiblockBuilder::new);
+
+            reg.add(GTCEu.id("tiered_multiblock"), KJSTieredMultiblockBuilder.class,
+                    KJSTieredMultiblockBuilder::new);
+
             reg.add(GTCEu.id("primitive"), MultiblockMachineBuilderJS.class,
                     (id) -> MultiblockMachineBuilderJS.createKJSMulti(id, PrimitiveWorkableMachine::new));
         });
@@ -256,6 +257,11 @@ public class GregTechKubeJSPlugin implements KubeJSPlugin {
         event.add("GTFluidStorageKeys", FluidStorageKeys.class);
         event.add("GTFluidState", FluidState.class);
         event.add("GTMaterialIconSet", MaterialIconSet.class);
+        event.add("GTCoverTransferRates", com.gregtechceu.gtceu.api.cover.CoverTransferRates.class);
+        event.add("GTMachineUIExtensions", com.gregtechceu.gtceu.api.machine.mui.MachineUIExtensions.class);
+        event.add("GTMachineUISlot", com.gregtechceu.gtceu.api.machine.mui.MachineUIExtensions.Slot.class);
+        event.add("GTStructureKind", com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind.class);
+        event.add("GTGlobalRecipeModifiers", com.gregtechceu.gtceu.api.recipe.modifier.GlobalRecipeModifiers.class);
         event.add("GTViewerVisibility", com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerVisibility.class);
         if (GTCEu.isClientSide()) {
             // the page and preview widgets are client side classes

@@ -162,6 +162,19 @@ public final class Material {
         this.flags.addFlags(flags);
     }
 
+    /**
+     * Takes flags off the material, for addons and scripts that change a material somebody else made. Like adding, this
+     * can only be done until the registry is frozen. Flags that were added only because another flag needed them are
+     * not
+     * removed with it; remove those too.
+     */
+    public void removeFlags(MaterialFlag... flags) {
+        if (GTRegistries.MATERIALS.isFrozen()) {
+            throw new IllegalStateException("Cannot remove flag from material when registry is frozen!");
+        }
+        this.flags.removeFlags(flags);
+    }
+
     public boolean hasFlag(MaterialFlag flag) {
         return flags.hasFlag(flag);
     }

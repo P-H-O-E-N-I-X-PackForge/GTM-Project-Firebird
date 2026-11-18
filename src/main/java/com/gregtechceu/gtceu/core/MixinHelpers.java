@@ -94,6 +94,8 @@ public class MixinHelpers {
                 for (TagKey<Item> materialTag : material.getItemTags()) {
                     tagMap.computeIfAbsent(materialTag.location(), path -> new ArrayList<>()).addAll(entries);
                 }
+                tagMap.computeIfAbsent(CustomTags.TAG_PREFIX_ITEMS.location(), path -> new ArrayList<>())
+                        .addAll(entries);
 
                 if (entry.tagPrefix() == TagPrefix.crushed.value() && material.hasProperty(PropertyKey.ORE)) {
                     OreProperty ore = material.getPropertyOrThrow(PropertyKey.ORE);
@@ -137,6 +139,14 @@ public class MixinHelpers {
                     }
                 });
             });
+
+            var controllers = tagMap.computeIfAbsent(CustomTags.MULTIBLOCK_CONTROLLERS.location(),
+                    path -> new ArrayList<>());
+            for (var machine : GTRegistries.MACHINES) {
+                if (machine instanceof com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition) {
+                    controllers.add(makeItemEntry(machine.asItem()));
+                }
+            }
 
             if (!GTCEu.Mods.isAE2Loaded()) {
                 return;

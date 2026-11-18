@@ -35,6 +35,9 @@ public class SyncDataHolder {
     @Setter
     private boolean hasDirtyChildSyncObject = false;
     private boolean resyncAll = false;
+    /** What the simple client sync fields held when they were last looked at, to see that they changed. */
+    private final it.unimi.dsi.fastutil.objects.Object2ObjectMap<String, Object> lastSeen = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>();
+    private boolean seeded = false;
 
     public SyncDataHolder(ISyncManaged o) {
         holder = o;
@@ -52,6 +55,31 @@ public class SyncDataHolder {
         }
         dirtySyncFields.add(fieldName);
         holder.markAsChanged();
+    }
+
+    /**
+     * Marks the client sync fields that changed since this was last called, so that code that assigns a field does not
+     * also have to mark it. Only simple immutable values can be compared this way: numbers, booleans, strings, enums,
+     * resource locations, block positions, block states and text. A field of another type, such as a list or an
+     * object that is changed in place, still has to be marked with {@link #markClientSyncFieldDirty}.
+     * <p>
+     * The first call only records the values. Called each tick on the server, before the sync packet is made.
+     */
+    public void detectChangedFields() {
+        for (FieldSyncData field : syncData.getClientSyncFields().values()) {
+            Object current = field.handle.get(holder);
+            if (field.autoDetectable) {
+                if (seeded && !java.util.Objects.equals(lastSeen.get(field.fieldName), current)) {
+                    dirtySyncFields.add(field.fieldName);
+                    holder.markAsChanged();
+                }
+                lastSeen.put(field.fieldName, current);
+            } else if (current instanceof ISyncManaged child) {
+                child.getSyncDataHolder().detectChangedFields();
+                if (child.getSyncDataHolder().needsSync()) setHasDirtyChildSyncObject(true);
+            }
+        }
+        seeded = true;
     }
 
     public void resyncAllFields() {

@@ -14,6 +14,7 @@ import com.gregtechceu.gtceu.api.machine.trait.ICapabilityTrait;
 import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic;
 import com.gregtechceu.gtceu.api.recipe.DummyCraftingInput;
 import com.gregtechceu.gtceu.api.recipe.GTRecipe;
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.recipe.ingredient.IntProviderIngredient;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 
@@ -110,6 +112,15 @@ public class NotifiableItemStackHandler extends NotifiableRecipeHandlerTrait<Siz
         // Necessary for simulation since we don't actually modify the slot's contents
         // Doesn't hurt for execution, and definitely cheaper than copying the entire storage
         ItemStack[] visited = new ItemStack[storage.getSlots()];
+        // what the slots held before, for taking the changes back if the recipe does not go through
+        ItemStack[] backup = simulate || !RecipeTransaction.isActive() ? null : new ItemStack[storage.getSlots()];
+        if (backup != null) {
+            RecipeTransaction.record(() -> {
+                for (int i = 0; i < backup.length; i++) {
+                    if (backup[i] != null) storage.setStackInSlot(i, backup[i]);
+                }
+            });
+        }
         for (var it = left.listIterator(); it.hasNext();) {
             var ingredient = it.next();
             if (!(ingredient.ingredient().getCustomIngredient() instanceof IntProviderIngredient) &&
@@ -139,6 +150,7 @@ public class NotifiableItemStackHandler extends NotifiableRecipeHandlerTrait<Siz
                 if (io == IO.IN) {
                     if (current.isEmpty()) continue;
                     if (ingredient.ingredient().test(current)) {
+                        if (backup != null && backup[slot] == null) backup[slot] = storage.getStackInSlot(slot).copy();
                         var extracted = recipe == null ? null : getActioned(storage, slot, recipe.ingredientActions);
                         if (extracted == null) extracted = storage.extractItem(slot, Math.min(count, amount), simulate);
                         if (!extracted.isEmpty()) {
@@ -170,6 +182,9 @@ public class NotifiableItemStackHandler extends NotifiableRecipeHandlerTrait<Siz
                     // Only try this slot if not visited or if visited with the same type of item
                     if (visited[slot] == null || ItemStack.isSameItemSameComponents(visited[slot], output)) {
                         if (count < output.getMaxStackSize() && count < storage.getSlotLimit(slot)) {
+                            if (backup != null && backup[slot] == null) {
+                                backup[slot] = storage.getStackInSlot(slot).copy();
+                            }
                             var remainder = recipe == null ? null :
                                     getActioned(storage, slot, recipe.ingredientActions);
                             if (remainder == null) remainder = storage.insertItem(slot, output, simulate);
@@ -296,8 +311,17 @@ public class NotifiableItemStackHandler extends NotifiableRecipeHandlerTrait<Siz
         storage.setStackInSlot(index, stack);
     }
 
+    /** Whether the machine has the IO of this disabled, as a locked bus does: it is not used by recipes. */
+    @Setter
+    protected BooleanSupplier isIODisabled = () -> false;
+
+    public boolean isIODisabled() {
+        return isIODisabled.getAsBoolean();
+    }
+
     @Override
     public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+        if (isIODisabled.getAsBoolean()) return stack;
         if (canCapInput()) {
             return storage.insertItem(slot, stack, simulate);
         }
@@ -310,6 +334,7 @@ public class NotifiableItemStackHandler extends NotifiableRecipeHandlerTrait<Siz
 
     @Override
     public ItemStack extractItem(int slot, int amount, boolean simulate) {
+        if (isIODisabled.getAsBoolean()) return ItemStack.EMPTY;
         if (canCapOutput()) {
             return storage.extractItem(slot, amount, simulate);
         }

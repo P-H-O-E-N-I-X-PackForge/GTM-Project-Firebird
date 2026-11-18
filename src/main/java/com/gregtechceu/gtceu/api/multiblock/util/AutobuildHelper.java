@@ -42,6 +42,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine.DEFAULT_STRUCTURE;
@@ -95,6 +96,7 @@ public class AutobuildHelper {
         PredicateContext cxt = new PredicateContext(null);
         cxt.updateLevel(level);
         int checkedBlocks = 0;
+        boolean stoppedEarly = false;
         for (var entry : blocksToPlace.entrySet()) {
             BlockPos pos = entry.getKey().offset(controllerOffset);
             var blockState = level.getBlockState(pos);
@@ -121,6 +123,7 @@ public class AutobuildHelper {
                 }
             }
             if (checkedBlocks > 32) {
+                stoppedEarly = true;
                 break;
             }
         }
@@ -197,16 +200,86 @@ public class AutobuildHelper {
                     (soundType.getVolume() + 1.0F) / 2.0F, soundType.getPitch() * 0.8F);
         }
 
-        printBlockList(Component.translatable("gtceu.autobuild.placed_blocks").withStyle(ChatFormatting.GREEN),
-                whatWePlaced, player);
-        printBlockList(Component.translatable("gtceu.autobuild.missing_blocks").withStyle(ChatFormatting.RED),
-                whatWeWant, player);
-
-        if (!canNotPlaceBlocks.isEmpty()) player.displayClientMessage(
-                Component.translatable("gtceu.autobuild.unplaced_blocks").withStyle(ChatFormatting.RED), false);
-        if (!canNotPlaceBlocks.isEmpty())
+        report(player, whatWePlaced, whatWeWant, canNotPlaceBlocks, replaceableBlocks.isEmpty(), stoppedEarly);
+        if (!canNotPlaceBlocks.isEmpty()) {
             PacketDistributor.sendToPlayer(player,
                     new SPacketAutobuildHighlight(canNotPlaceBlocks.keySet().toLongArray()));
+        }
+    }
+
+    private static final int MAX_REPORT_LINES = 5;
+
+    /**
+     * Tells the player how the build went: what was built, what is missing, and what is in the way.
+     *
+     * @param placed         the blocks that were placed, by item
+     * @param wanted         what was still wanted when the building was done, so what is missing
+     * @param obstructed     the blocks in the way of the structure, by position
+     * @param nothingToPlace whether there was nothing that could be placed to begin with
+     * @param stoppedEarly   whether more is left to build than a use of the terminal builds
+     */
+    private static void report(ServerPlayer player, Map<Item, Integer> placed, Map<Item, Integer> wanted,
+                               Long2ObjectOpenHashMap<BlockState> obstructed, boolean nothingToPlace,
+                               boolean stoppedEarly) {
+        int placedCount = placed.values().stream().mapToInt(Integer::intValue).sum();
+        int missingCount = wanted.values().stream().mapToInt(i -> Math.max(0, i)).sum();
+
+        if (nothingToPlace && obstructed.isEmpty()) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.nothing")
+                    .withStyle(ChatFormatting.GRAY), false);
+            return;
+        }
+
+        if (placedCount > 0 && missingCount == 0) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.success", placedCount)
+                    .withStyle(ChatFormatting.GREEN), false);
+        } else if (placedCount > 0) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.partial", placedCount)
+                    .withStyle(ChatFormatting.YELLOW), false);
+            printMissing(player, wanted);
+        } else if (missingCount > 0) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.no_blocks")
+                    .withStyle(ChatFormatting.RED), false);
+            printMissing(player, wanted);
+        }
+
+        if (!obstructed.isEmpty()) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.obstructed", obstructed.size())
+                    .withStyle(ChatFormatting.RED), false);
+            // what is in the way, by block
+            Map<Block, Integer> blocking = new LinkedHashMap<>();
+            for (var state : obstructed.values()) blocking.merge(state.getBlock(), 1, Integer::sum);
+            int lines = 0;
+            for (var entry : blocking.entrySet()) {
+                if (lines++ >= MAX_REPORT_LINES) {
+                    player.displayClientMessage(Component.translatable("gtceu.terminal.report.more",
+                            blocking.size() - MAX_REPORT_LINES).withStyle(ChatFormatting.GRAY), false);
+                    break;
+                }
+                player.displayClientMessage(Component.translatable("gtceu.terminal.report.entry", entry.getValue(),
+                        entry.getKey().getName()).withStyle(ChatFormatting.GRAY), false);
+            }
+        }
+
+        if (stoppedEarly && placedCount > 0) {
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.continue")
+                    .withStyle(ChatFormatting.AQUA), false);
+        }
+    }
+
+    private static void printMissing(ServerPlayer player, Map<Item, Integer> wanted) {
+        var missing = wanted.entrySet().stream().filter(e -> e.getValue() > 0)
+                .sorted(Map.Entry.<Item, Integer>comparingByValue().reversed()).toList();
+        for (int i = 0; i < missing.size(); i++) {
+            if (i >= MAX_REPORT_LINES) {
+                player.displayClientMessage(Component.translatable("gtceu.terminal.report.more",
+                        missing.size() - MAX_REPORT_LINES).withStyle(ChatFormatting.GRAY), false);
+                break;
+            }
+            player.displayClientMessage(Component.translatable("gtceu.terminal.report.entry",
+                    missing.get(i).getValue(), missing.get(i).getKey().getDescription())
+                    .withStyle(ChatFormatting.GRAY), false);
+        }
     }
 
     private static boolean placeAsPlayer(ServerPlayer player, BlockPos pos, BlockState state, ItemStack stack) {

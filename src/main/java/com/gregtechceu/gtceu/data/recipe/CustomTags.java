@@ -18,6 +18,18 @@ import net.neoforged.neoforge.common.Tags;
 public class CustomTags {
 
     // Added Vanilla tags
+    /**
+     * Every multiblock controller, from GT and from addons. Filled when tags load, so it needs no data files; search
+     * for
+     * {@code #gtceu:multiblock_controllers} in the recipe viewer.
+     */
+    public static final TagKey<Item> MULTIBLOCK_CONTROLLERS = TagUtil.createModItemTag("multiblock_controllers");
+    /**
+     * Every item that comes from a tag prefix and a material: dusts, ingots, plates, ore and material blocks, frames,
+     * pipes, cables and the rest. Filled when tags load. To leave them out of a recipe viewer search, add
+     * {@code -#gtceu:tag_prefix_items} to it.
+     */
+    public static final TagKey<Item> TAG_PREFIX_ITEMS = TagUtil.createModItemTag("tag_prefix_items");
     public static final TagKey<Item> PISTONS = TagUtil.createItemTag("pistons");
     // common/mod compat tags
     public static final TagKey<Item> DOUGHS = TagUtil.createItemTag("doughs");

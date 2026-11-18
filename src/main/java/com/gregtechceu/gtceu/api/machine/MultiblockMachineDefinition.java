@@ -19,8 +19,6 @@ import brachy.modularui.value.sync.PanelSyncManager;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import io.netty.handler.codec.DecoderException;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -52,6 +50,7 @@ public class MultiblockMachineDefinition extends MachineDefinition {
     @Getter
     private final boolean generator;
     private volatile Map<String, Supplier<IBlockPattern>> structurePatterns;
+    private final Map<String, com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind> structureKinds;
     @Getter
     private final boolean allowFlip;
     @Getter
@@ -66,6 +65,19 @@ public class MultiblockMachineDefinition extends MachineDefinition {
     private final TriFunction<MultiblockControllerMachine, MultiblockPartMachine, Direction, BlockState> partAppearance;
     @Getter
     private final BiFunction<MultiblockControllerMachine, PanelSyncManager, List<IWidget>> additionalDisplay;
+
+    /** How the structure relates to the main one; structures are alternatives unless they were added as additions. */
+    public com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind getStructureKind(String name) {
+        return structureKinds.getOrDefault(name,
+                com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind.ALTERNATIVE);
+    }
+
+    /** The names of the structures that are built on top of the main one, in the order they were added. */
+    public java.util.List<String> getAdditionStructures() {
+        return structurePatterns.keySet().stream()
+                .filter(n -> getStructureKind(n) == com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind.ADDITION)
+                .toList();
+    }
 
     public Map<String, Supplier<IBlockPattern>> getStructurePatterns() {
         return structurePatterns;
@@ -115,6 +127,7 @@ public class MultiblockMachineDefinition extends MachineDefinition {
             structurePatterns.put(entry.getKey(), GTMemoizer.memoize(() -> entry.getValue().apply(this)));
         }
         this.structurePatterns = Collections.unmodifiableMap(structurePatterns);
+        this.structureKinds = Map.copyOf(properties.kinds);
         this.allowFlip = properties.allowFlip();
         this.renderXEIPreview = properties.renderMultiblockXEIPreview;
         this.renderWorldPreview = properties.renderMultiblockWorldPreview;
@@ -132,6 +145,7 @@ public class MultiblockMachineDefinition extends MachineDefinition {
 
         private boolean generator = false;
         private final Map<String, Function<MultiblockMachineDefinition, IBlockPattern>> patterns = new java.util.LinkedHashMap<>();
+        private final Map<String, com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind> kinds = new java.util.HashMap<>();
         private boolean allowFlip = true;
         private final List<Supplier<ItemStack[]>> recoveryItems = new ArrayList<>();
         private Function<MultiblockControllerMachine, Comparator<MultiblockPartMachine>> partSorter = (c) -> (a,

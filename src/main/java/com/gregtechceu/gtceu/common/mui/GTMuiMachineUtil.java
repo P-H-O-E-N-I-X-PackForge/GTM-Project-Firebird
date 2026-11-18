@@ -89,7 +89,10 @@ public class GTMuiMachineUtil {
                                                                String syncHandlerName, int maxSlots, char key,
                                                                String... matrix) {
         for (int i = 0; i < maxSlots; i++) {
-            syncManager.syncValue(syncHandlerName, i, SyncHandlers.fluidSlot(fluidTank.getStorages()[i]));
+            // through a guard, which lets nothing through while the hatch is locked
+            syncManager.syncValue(syncHandlerName, i, SyncHandlers.fluidSlot(
+                    new com.gregtechceu.gtceu.api.transfer.fluid.GuardedFluidTank(fluidTank.getStorages()[i],
+                            fluidTank::isIODisabled)));
         }
 
         return SlotGroupWidget.builder()

@@ -83,7 +83,10 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
 
         // Covers its width too, with a minimum: a column that took its width from the panel left the panel at the
         // minimum width however wide the slots and text inside it were, so wide pages overflowed their frame.
-        Flow mainColumn = Flow.col().coverChildrenWidth(150).coverChildrenHeight();
+        // Its children start at its left edge. They were centered, which put the text rows of a wide page, such as a
+        // fusion or blast furnace recipe, far over to the right of the slots instead of under them.
+        Flow mainColumn = Flow.col().coverChildrenWidth(150).coverChildrenHeight()
+                .crossAxisAlignment(Alignment.CrossAxis.START);
 
         child(mainColumn);
         margin(2, 2, 2, 1);
@@ -240,10 +243,11 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> imp
     }
 
     private void attachOverclockButton() {
-        textComponents.child(new ButtonWidget<>().background(IDrawable.NONE)
+        // under the recipe ID button, at the edge of the page
+        child(new ButtonWidget<>().background(IDrawable.NONE)
                 .hoverBackground(IDrawable.NONE)
                 .size(22, 12)
-                .rightRel(0.0f)
+                .right(1).bottom(0)
                 .overlay(Text.dynamic(() -> Component.literal(GTValues.VNF[tier])))
                 .tooltipBuilder(tooltip -> {
                     tooltip.addLine(Text.lang("gtceu.oc.tooltip.0", GTValues.VNF[minTier]));

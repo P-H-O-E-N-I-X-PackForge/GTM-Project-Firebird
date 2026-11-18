@@ -253,22 +253,36 @@ public class FormattingUtil {
 
     /**
      * A recipe's duration as it is shown on recipe pages: "Duration: 90 secs", or, with the long format on in the
-     * client config and a duration of a minute or more, "Duration: 00:00:00:01:30" in the form
-     * {@code mm:dd:hh:mm:ss}: months, days, hours, minutes and seconds, a month being 30 days.
+     * client
+     * config and a duration of two minutes or more, as a clock that only has the parts it needs: "Duration: 5:12.5",
+     * "Duration: 2:05:12", "Duration: 3d 4:00:00" and "Duration: 41m 12d 18:09:42.35". A month is 30 days.
      *
      * @param ticks the duration, in ticks
      */
     public static Component formatRecipeDuration(double ticks) {
         double seconds = ticks / 20;
-        if (!ConfigHolder.INSTANCE.client.recipeDurationHoursMinutes || seconds < 60) {
+        if (!ConfigHolder.INSTANCE.client.recipeDurationHoursMinutes || seconds < 120) {
             return Component.translatable("gtceu.recipe.duration", formatNumbers(seconds));
         }
         long whole = (long) seconds;
+        long months = whole / MONTH_SECONDS;
+        long days = (whole % MONTH_SECONDS) / 86400;
+        long hours = (whole % 86400) / 3600;
+        long minutes = (whole % 3600) / 60;
         double rest = seconds - (whole - whole % 60);
-        String secondsText = formatNumbers(rest);
-        String text = String.format("%02d:%02d:%02d:%02d:", whole / MONTH_SECONDS, (whole % MONTH_SECONDS) / 86400,
-                (whole % 86400) / 3600, (whole % 3600) / 60) + (rest < 10 ? "0" + secondsText : secondsText);
-        return Component.translatable("gtceu.recipe.duration.long", text);
+        // two decimals, but only when there is a fraction
+        String secondsText = rest - Math.floor(rest) >= 0.005 ? String.format("%05.2f", rest) :
+                String.format("%02d", (long) Math.floor(rest + 0.005));
+        StringBuilder text = new StringBuilder();
+        if (months > 0) text.append(months).append("m ");
+        if (months > 0 || days > 0) text.append(days).append("d ");
+        if (months > 0 || days > 0 || hours > 0) {
+            text.append(hours).append(':').append(String.format("%02d", minutes)).append(':');
+        } else {
+            text.append(minutes).append(':');
+        }
+        text.append(secondsText);
+        return Component.translatable("gtceu.recipe.duration.long", text.toString());
     }
 
     public static String formatTime(long ticks) {

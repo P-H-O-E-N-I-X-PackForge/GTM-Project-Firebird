@@ -139,6 +139,9 @@ public abstract class ManagedSyncBlockEntity extends BlockEntity implements ISyn
      */
     @MustBeInvokedByOverriders
     public void serverTick() {
+        if (com.gregtechceu.gtceu.config.ConfigHolder.INSTANCE.machines.autoDetectSyncChanges) {
+            getSyncDataHolder().detectChangedFields();
+        }
         setChanged();
         if (isDirty) {
             Objects.requireNonNull(getLevel()).sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(),

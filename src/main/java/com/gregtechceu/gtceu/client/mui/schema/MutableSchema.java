@@ -44,6 +44,9 @@ public class MutableSchema implements ISchema {
     /** The structure of the multiblock this holds, which is the one formed in it. */
     @Setter
     private String structureName = DEFAULT_STRUCTURE;
+    /** Whether the controller is formed when the blocks are set, and whether it is shown working. */
+    @Setter
+    private com.gregtechceu.gtceu.api.mui.PreviewMode previewMode = com.gregtechceu.gtceu.api.mui.PreviewMode.FORMED;
 
     public MutableSchema() {}
 
@@ -83,11 +86,52 @@ public class MutableSchema implements ISchema {
             }
         }
 
-        if (controller != null) {
+        if (controller != null && previewMode != com.gregtechceu.gtceu.api.mui.PreviewMode.UNFORMED) {
             PatternState patternState = controller.getPatternState(structureName);
             controller.checkStructurePattern(structureName);
             if (patternState.getState().isValid()) {
                 controller.formStructure(structureName);
+                if (previewMode == com.gregtechceu.gtceu.api.mui.PreviewMode.ACTIVE) {
+                    showWorking(controller);
+                    for (var part : parts) showWorking(part);
+                    // what a running recipe does: the logic is working, which the renders of the machine read, and
+                    // the machine turns its active blocks on and its parts to the working look
+                    controller.getTraitOptional(com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic.class)
+                            .ifPresent(
+                                    com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic::showWorkingForPreview);
+                    if (controller instanceof com.gregtechceu.gtceu.api.machine.feature.IRecipeLogicMachine machine) {
+                        machine.recipeLogicStatusChanged(
+                                com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic.Status.IDLE,
+                                com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic.Status.WORKING);
+                    }
+                    // the view draws the blocks of this map, not those of the level, which the machine just changed
+                    // (this.blocks: the parameter of this method has the same name, and is not what is drawn)
+                    for (long packed : this.blocks.keySet().toLongArray()) {
+                        var current = getLevel().getBlockState(BlockPos.of(packed));
+                        if (current != this.blocks.get(packed) &&
+                                current.hasProperty(
+                                        com.gregtechceu.gtceu.api.block.property.GTBlockStateProperties.ACTIVE)) {
+                            this.blocks.put(packed, current);
+                        }
+                    }
+                    {
+                        int activeProp = 0, activeOn = 0, levelOn = 0;
+                        for (long packed : this.blocks.keySet().toLongArray()) {
+                            var inMap = this.blocks.get(packed);
+                            var inLevel = getLevel().getBlockState(BlockPos.of(packed));
+                            var prop = com.gregtechceu.gtceu.api.block.property.GTBlockStateProperties.ACTIVE;
+                            if (inMap.hasProperty(prop)) {
+                                activeProp++;
+                                if (inMap.getValue(prop)) activeOn++;
+                                if (inLevel.hasProperty(prop) && inLevel.getValue(prop)) levelOn++;
+                            }
+                        }
+                        com.gregtechceu.gtceu.GTCEu.LOGGER.info(
+                                "[preview] active: controller {} ({}), blocks with the active property {}, on in the map {}, on in the level {}",
+                                controller.getClass().getSimpleName(), controller.getDefinition().getId(), activeProp,
+                                activeOn, levelOn);
+                    }
+                }
             }
         }
 
@@ -95,6 +139,18 @@ public class MutableSchema implements ISchema {
         this.center = BlockPosUtil.getCenterF(min, max);
         this.bounds = Pair.of(min, max);
         return this;
+    }
+
+    /**
+     * Has the machine look as it does while a recipe runs. The recipe logic does not run here, so only how it looks.
+     */
+    private static void showWorking(com.gregtechceu.gtceu.api.machine.MetaMachine machine) {
+        var state = machine.getRenderState();
+        var property = com.gregtechceu.gtceu.api.machine.property.GTMachineModelProperties.RECIPE_LOGIC_STATUS;
+        if (state.hasProperty(property)) {
+            machine.setRenderState(state.setValue(property,
+                    com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic.Status.WORKING));
+        }
     }
 
     public MutableSchema updateBlockState(BlockPos pos, BlockState state) {

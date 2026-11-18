@@ -84,6 +84,9 @@ public class GTMultiblockTextUtil {
                     if (PatternError.CONTROLLER.equals(pos)) pos = controller.getBlockPos();
                     final BlockPos fpos = pos;
                     unformed.child(new ButtonWidget<>()
+                            .size(96, 14)
+                            .margin(0, 2)
+                            .overlay(Text.lang("gtceu.multiblock.pattern.error.show_in_world").asIcon())
                             .onMousePressed((c, b) -> {
                                 ((ModularGuiContext) c).getScreen().getMainPanel().closeIfOpen();
                                 AABBHighlightRenderer.INSTANCE.addHighlight(AABBHighlightRenderer.builder()
@@ -96,10 +99,20 @@ public class GTMultiblockTextUtil {
                                 return true;
                             })
                             .setEnabledIf(w -> fpos != null)
-                            .tooltip(r -> r.add("Highlight the missing predicate in world")));
+                            .tooltip(r -> r.addLine(
+                                    Component.translatable("gtceu.multiblock.pattern.error.show_in_world.tooltip"))));
 
                     for (var error : listSyncHandler.getValue()) {
-                        error.getPatternErrorUIModifier().apply(unformed);
+                        // each error in a box of its own, so that errors that read alike do not share a parent
+                        Flow box = Flow.col().widthRel(1f).coverChildrenHeight()
+                                .crossAxisAlignment(Alignment.CrossAxis.START);
+                        error.getPatternErrorUIModifier().apply(box);
+                        unformed.child(com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerParts.unique(box));
+                        // a line between the errors
+                        // widgets that are alike cannot share a parent, so each gets what sets it apart
+                        unformed.child(com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerParts.unique(
+                                new brachy.modularui.widget.Widget<>().widthRel(1f).height(1)
+                                        .background(new brachy.modularui.drawable.Rectangle().color(0x33FFFFFF))));
                     }
                     return unformed;
                 });

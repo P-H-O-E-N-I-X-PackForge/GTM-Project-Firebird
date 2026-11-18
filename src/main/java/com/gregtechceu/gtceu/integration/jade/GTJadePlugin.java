@@ -47,7 +47,8 @@ public class GTJadePlugin implements IWailaPlugin {
                 new EnergyConverterModeProvider(),
                 new BatteryStorageInfoProvider(),
                 new LDPEndpointProvider(),
-                new ProgrammableCircuitProvider());
+                new ProgrammableCircuitProvider(),
+                new LockableHatchProvider());
 
         if (GTCEu.Mods.isAE2Loaded()) {
             register(registration, new MEGridConnectedProvider(), new MEPatternBufferProvider(),
@@ -84,7 +85,8 @@ public class GTJadePlugin implements IWailaPlugin {
                 new EnergyConverterModeProvider(),
                 new BatteryStorageInfoProvider(),
                 new CableBlockProvider(),
-                new ProgrammableCircuitProvider());
+                new ProgrammableCircuitProvider(),
+                new LockableHatchProvider());
 
         if (GTCEu.Mods.isAE2Loaded()) {
             register(registration, new MEGridConnectedProvider(), new MEPatternBufferProvider(),

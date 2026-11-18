@@ -70,6 +70,7 @@ public class DualHatchPartMachine extends ItemBusPartMachine {
     @Override
     public void onLoad() {
         super.onLoad();
+        tank.setIsIODisabled(this::isLocked);
         tankSubs = tank.addChangedListener(this::updateInventorySubscription);
     }
 
@@ -98,7 +99,7 @@ public class DualHatchPartMachine extends ItemBusPartMachine {
             this.hasFluidHandler = false;
         }
 
-        if (isWorkingEnabled() && (canOutput || io == IO.IN) && (hasItemHandler || hasFluidHandler)) {
+        if (canAutoIO() && (canOutput || io == IO.IN) && (hasItemHandler || hasFluidHandler)) {
             autoIOSubs = subscribeServerTick(autoIOSubs, this::autoIO);
         } else if (autoIOSubs != null) {
             autoIOSubs.unsubscribe();
@@ -109,7 +110,7 @@ public class DualHatchPartMachine extends ItemBusPartMachine {
     @Override
     protected void autoIO() {
         if (getOffsetTimer() % 5 == 0) {
-            if (isWorkingEnabled()) {
+            if (canAutoIO()) {
                 if (io == IO.OUT) {
                     if (hasItemHandler) {
                         getInventory().exportToNearby(getFrontFacing());
@@ -177,7 +178,9 @@ public class DualHatchPartMachine extends ItemBusPartMachine {
                     return new ItemSlot().syncHandler(slotGroupName, i);
                 })
                 .key('F', i -> {
-                    FluidSlotSyncHandler syncHandler = new FluidSlotSyncHandler(tank.getStorages()[i])
+                    FluidSlotSyncHandler syncHandler = new FluidSlotSyncHandler(
+                            new com.gregtechceu.gtceu.api.transfer.fluid.GuardedFluidTank(tank.getStorages()[i],
+                                    this::isLocked))
                             .canFillSlot(io.support(IO.IN))
                             .canDrainSlot(true);
                     syncManager.syncValue(slotGroupName + "_fluid", i, syncHandler);

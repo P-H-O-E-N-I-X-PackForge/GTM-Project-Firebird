@@ -34,10 +34,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
+import brachy.modularui.api.IPanelHandler;
 import brachy.modularui.api.drawable.IDrawable;
 import brachy.modularui.api.drawable.IIcon;
 import brachy.modularui.api.drawable.Text;
 import brachy.modularui.api.widget.IGuiAction;
+import brachy.modularui.api.widget.IWidget;
 import brachy.modularui.drawable.*;
 import brachy.modularui.drawable.schema.BlockHighlight;
 import brachy.modularui.integration.recipeviewer.RecipeSlotRole;
@@ -55,10 +57,8 @@ import brachy.modularui.widgets.*;
 import brachy.modularui.widgets.dynamic.DynamicHandler;
 import brachy.modularui.widgets.dynamic.DynamicWidget;
 import brachy.modularui.widgets.layout.Flow;
-import brachy.modularui.widgets.menu.ContextMenuButton;
-import brachy.modularui.api.IPanelHandler;
-import brachy.modularui.api.widget.IWidget;
 import brachy.modularui.widgets.menu.AbstractMenuButton;
+import brachy.modularui.widgets.menu.ContextMenuButton;
 import brachy.modularui.widgets.menu.Menu;
 import brachy.modularui.widgets.menu.MenuPanel;
 import brachy.modularui.widgets.textfield.TextFieldWidget;
@@ -88,6 +88,9 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     private final DynamicHandler selectedBlockHandler = new DynamicHandler();
     private final DynamicHandler structureErrorHandler = new DynamicHandler();
     private final DynamicHandler patternsHandler = new DynamicHandler();
+    private final DynamicHandler layersHandler = new DynamicHandler();
+    private final DynamicHandler keysHandler = new DynamicHandler();
+    private int shownLayerCount = -1;
     private final Reference2IntMap<Block> blockCounts = new Reference2IntOpenHashMap<>();
 
     @Getter
@@ -116,6 +119,18 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     @Getter
     private boolean terminal;
 
+    // what the player chose last stays for the next preview that is opened
+    private static com.gregtechceu.gtceu.api.mui.PreviewMode defaultMode = com.gregtechceu.gtceu.api.mui.PreviewMode.FORMED;
+    private static boolean defaultGrid = false;
+    private static int defaultGraduation = 0;
+    private static boolean defaultTurntable = false;
+    private static final int[] GRADUATION_STEPS = { 0, 3, 5, 10 };
+
+    private com.gregtechceu.gtceu.api.mui.PreviewMode mode = defaultMode;
+    private boolean showGrid = defaultGrid;
+    private int graduationIndex = defaultGraduation;
+    private boolean turntable = defaultTurntable;
+
     private int yLevel = Integer.MAX_VALUE;
 
     @Setter
@@ -136,12 +151,14 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             case ALL, NON_Y_AXIS, NONE -> Direction.UP;
         };
         this.multiblockSchemaInfo = schemaInfo == null ? new MultiblockSchemaInfo(definition) : schemaInfo;
+        this.multiblockSchemaInfo.setPreviewMode(mode);
         if (!terminal) restoreStructureChoice();
         refreshSchema();
 
         PreviewSchemaRenderer renderer = new PreviewSchemaRenderer(this.multiblockSchemaInfo.getMapSchema());
         renderer.highlightRenderer(new BlockHighlight(Color.withAlpha(Color.GREEN.brighter(1), 0.9f), 1 / 32f));
         this.previewRenderer = renderer;
+        renderer.setGrid(showGrid, GRADUATION_STEPS[graduationIndex]);
         schemaRenderer = renderer;
         this.variants = MultiblockPreviewExtensions.variantsFor(this);
         for (var variant : variants) variantShown.put(variant.id(), variant.shownByDefault());
@@ -154,6 +171,9 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                     BlockState state = this.multiblockSchemaInfo.getMapSchema().getLevel()
                             .getBlockState(rayTrace.getBlockPos());
                     this.selectionInfo = SelectionInfo.of(rayTrace, state);
+                    if (previewRenderer != null) {
+                        previewRenderer.setLayer("selection", List.of(rayTrace.getBlockPos()), 0xFFFFD34D);
+                    }
                     this.selectedBlockHandler.notifyUpdate();
                     MultiblockPreviewExtensions.fireSelectionChanged(this);
                     return true;
@@ -233,27 +253,54 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             return new EmptyWidget();
         });
 
+        this.layersHandler.widgetProvider(() -> createLayerSlider(width));
+
         this.patternsHandler.widgetProvider(() -> {
             Flow patternColumn = Flow.col().name("structure_pattern").coverChildren();
-            Flow predicatesRow = Flow.row()
-                    .name("predicates")
-                    .height(20)
-                    .coverChildrenWidth();
             IBlockPattern shown = this.multiblockSchemaInfo.getPattern();
             if (shown instanceof BlockPattern blockPattern) {
                 createSliceSliders(patternColumn, blockPattern);
-                createPredicateMenus(predicatesRow, blockPattern);
             } else if (shown instanceof ExpandablePattern expandablePattern) {
                 createConstraintSliders(patternColumn, expandablePattern);
             }
-            patternColumn.child(predicatesRow);
             return patternColumn;
+        });
+
+        // the keys of the structure, each a menu of the blocks it can be, in a column at the left of the view
+        this.keysHandler.widgetProvider(() -> {
+            Flow keys = Flow.col().name("keys").coverChildren().childPadding(2);
+            if (this.multiblockSchemaInfo.getPattern() instanceof BlockPattern blockPattern) {
+                createPredicateMenus(keys, blockPattern);
+            }
+            return keys;
         });
 
         schemaRenderer.camera().setPosAndLookAt(0, 0, 0,
                 this.multiblockSchemaInfo.getMapSchema().getCenter());
         PredicateContext context = new PredicateContext(null);
-        SchemaWidget schema = schemaRenderer.asWidget()
+        // the turntable turns the view a little each frame
+        SchemaWidget schema = new SchemaWidget(schemaRenderer) {
+
+            {
+                // the middle of the blocks, not of their corners, and far enough away to have all of it in view
+                offset(0.5f, 0.5f, 0.5f);
+                scale(fitDistance());
+            }
+
+            private long lastFrame;
+
+            @Override
+            public void draw(ModularGuiContext context, brachy.modularui.theme.WidgetThemeEntry<?> widgetTheme) {
+                if (turntable) {
+                    long now = System.nanoTime();
+                    if (lastFrame != 0) yaw(getYaw() + (now - lastFrame) / 1_000_000_000f * 0.6f);
+                    lastFrame = now;
+                } else {
+                    lastFrame = 0;
+                }
+                super.draw(context, widgetTheme);
+            }
+        }
 
                 .listenGuiAction(setBlockOnClick)
                 .tooltipDynamic(text -> {
@@ -291,11 +338,17 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
             return pos.getY() <= yLevel;
         });
 
+        // the buttons of the view, after the others
+        final int viewButtons = 45 + (definition.getStructurePatterns().size() > 1 ? 19 : 0) +
+                (variants.isEmpty() ? 0 : 19);
         this.coverChildren()
                 .padding(7)
                 .childIf(terminal, () -> new ButtonWidget<>()
                         .overlay(new ItemDrawable(GTDimensionMarkers.OVERWORLD.value().getIcon()).asIcon().size(16))
-                        .tooltip(r -> r.addLine(Component.literal("Press to display preview in world!")))
+                        .tooltip(r -> {
+                            r.addLine(Component.translatable("gtceu.multiblock.preview.in_world"));
+                            r.addLine(Component.translatable("gtceu.multiblock.preview.in_world.hint"));
+                        })
                         .rightRel(1.0f)
                         .onMousePressed((c, b) -> {
                             if (controllerPos != null &&
@@ -312,68 +365,59 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                 // todo serialize these values as part of the schema nbt
                 .child(new ToggleButton()
                         .overlay(GTGuiTextures.PROGRESS_MIXER[1].asIcon().size(16))
-                        .tooltip(r -> r.addLine(Component.literal("Press to flip structure")))
+                        .tooltipDynamic(r -> {
+                            r.addLine(Component.translatable("gtceu.multiblock.preview.flip"));
+                            r.addLine(Component.translatable(isFlipped ? "gtceu.multiblock.preview.flip.on" :
+                                    "gtceu.multiblock.preview.flip.off"));
+                        })
+                        .tooltipAutoUpdate(true)
                         .left(26)
                         .value(new BoolValue.Dynamic(() -> isFlipped, v -> {
                             setFlipped(!isFlipped);
                             refreshSchema();
                             notifyWidgetHandlers();
                         })))
-                .child(new ButtonWidget<>()
-                        .overlay(new DynamicDrawable(() -> Text.dynamic(
-                                () -> Component.literal(yLevel == Integer.MAX_VALUE ? "A" : String.valueOf(yLevel)))
-                                .asIcon()))
-                        .tooltip(r -> r.addLine(Component.literal("Layer Selection")))
-                        .left(45)
-                        .onMousePressed((c, b) -> {
-                            var bounds = multiblockSchemaInfo.getMapSchema().getBounds();
-                            int min = bounds.getFirst().getY();
-                            int max = bounds.getSecond().getY();
-
-                            if (b == InputConstants.MOUSE_BUTTON_LEFT) {
-                                if (yLevel == Integer.MAX_VALUE) yLevel = min - 1;
-                                yLevel += 1;
-                            } else if (b == InputConstants.MOUSE_BUTTON_RIGHT) {
-                                if (yLevel == Integer.MAX_VALUE) yLevel = max;
-                                yLevel -= 1;
-                            } else if (b == InputConstants.MOUSE_BUTTON_MIDDLE) {
-                                yLevel = Integer.MAX_VALUE;
-                            }
-                            if (yLevel >= max) {
-                                yLevel = Integer.MAX_VALUE;
-                            }
-                            if (yLevel < min) {
-                                yLevel = Integer.MAX_VALUE;
-                            }
-                            applyFilters();
-                            return true;
-                        }))
                 .childIf(definition.getStructurePatterns().size() > 1, this::createStructuresButton)
                 .childIf(!variants.isEmpty(), this::createVariantsMenu)
+                .child(createModeButton().left(viewButtons))
+                .childIf(
+                        !terminal && definition.getRotationState() != com.gregtechceu.gtceu.api.data.RotationState.NONE,
+                        () -> createRotateButton().left(viewButtons + 19))
+                .child(createGridButton().left(viewButtons + (terminal ? 19 : 38)))
+                .child(createTurntableButton().left(viewButtons + (terminal ? 38 : 57)))
                 .childIf(MultiblockPreviewExtensions.has(Slot.TOOLBAR, definition), () -> Flow.row()
                         .name("toolbar_extensions")
-                        .left(64 + (variants.isEmpty() ? 0 : 19) +
-                                (definition.getStructurePatterns().size() > 1 ? 19 : 0))
+                        .left(viewButtons + (terminal ? 57 : 76))
                         .coverChildren()
                         .childPadding(1)
                         .children(MultiblockPreviewExtensions.build(Slot.TOOLBAR, this), w -> w))
                 .child(Flow.col()
                         .name("main")
                         .coverChildren()
-                        .child(new DynamicWidget<>()
-                                .name("structure_patterns")
-                                .widthRel(1f)
-                                .coverChildrenHeight()
-                                .clientOnlyHandler(this.patternsHandler))
+                        // on top, under the toolbar: the selected block, and the sizes of the repeating parts
+                        .child(Flow.row()
+                                .name("top_row")
+                                .marginTop(22)
+                                .coverChildren()
+                                .childPadding(4)
+                                .crossAxisAlignment(Alignment.CrossAxis.START)
+                                .child(new DynamicWidget<>()
+                                        .name("selected_block")
+                                        .coverChildren(20)
+                                        .clientOnlyHandler(this.selectedBlockHandler))
+                                .child(new DynamicWidget<>()
+                                        .name("structure_patterns")
+                                        .coverChildren(20)
+                                        .clientOnlyHandler(this.patternsHandler)))
                         .child(Flow.row()
                                 .name("schema_widgets")
                                 .crossAxisAlignment(Alignment.CrossAxis.START)
                                 .coverChildren()
                                 .childPadding(2)
                                 .child(new DynamicWidget<>()
-                                        .name("selected_block")
-                                        .coverChildren(20)
-                                        .clientOnlyHandler(this.selectedBlockHandler))
+                                        .name("keys")
+                                        .coverChildren()
+                                        .clientOnlyHandler(this.keysHandler))
                                 .childIf(MultiblockPreviewExtensions.has(Slot.LEFT, definition),
                                         () -> extensionColumn(Slot.LEFT))
                                 .child(new ParentWidget<>()
@@ -391,6 +435,11 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                                         .clientOnlyHandler(partsHandler))
                                 .childIf(MultiblockPreviewExtensions.has(Slot.RIGHT, definition),
                                         () -> extensionColumn(Slot.RIGHT)))
+                        .child(new DynamicWidget<>()
+                                .name("layers")
+                                .widthRel(1f)
+                                .coverChildrenHeight()
+                                .clientOnlyHandler(this.layersHandler))
                         .childIf(MultiblockPreviewExtensions.has(Slot.BELOW, definition),
                                 () -> extensionColumn(Slot.BELOW)))
                 .childIf(terminal, () -> new ButtonWidget<>()
@@ -422,7 +471,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             refreshSchema();
                             notifyWidgetHandlers();
                         }))
-                        .tooltip(r -> r.addLine(Component.translatable("gtceu.terminal.clear_preference"))))
+                        .tooltip(r -> r.addLine(Component.translatable("gtceu.terminal.ignore_preview_count"))))
                 .child(new DynamicWidget<>()
                         .right(-20)
                         .clientOnlyHandler(structureErrorHandler));
@@ -453,24 +502,8 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                                                 candidates.get(0).getItemStackForm()))
                                         .requiresClick()
                                         .openRightDown()
-                                        .menuList(l1 -> l1
-                                                .maxSize(80)
-                                                .coverChildrenWidth()
-                                                .childSeparator(Icon.EMPTY_2PX)
-                                                .children(candidates, blockInfo -> {
-                                                    Component stackName = blockInfo
-                                                            .getItemStackForm().getHoverName();
-                                                    return new ToggleButton()
-                                                            .value(new BoolValue.Dynamic(
-                                                                    () -> false,
-                                                                    (b) -> setUserDefinedBlockInfo(
-                                                                            this.selectionInfo.pos(),
-                                                                            blockInfo)))
-                                                            .size(16)
-                                                            .tooltip(r -> r.add(stackName))
-                                                            .overlay(new ItemDrawable(
-                                                                    blockInfo.getItemStackForm()));
-                                                }));
+                                        .menu(candidateGrid(candidates, blockInfo -> setUserDefinedBlockInfo(
+                                                this.selectionInfo.pos(), blockInfo)));
                             } else {
                                 return new ToggleButton()
                                         .value(new BoolValue.Dynamic(() -> false,
@@ -558,22 +591,29 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                         candidates.get(0).getItemStackForm()))
                 .requiresClick()
                 .openRightDown()
-                .menuList(l1 -> l1
-                        .maxSize(80)
-                        .coverChildrenWidth()
-                        .childSeparator(Icon.EMPTY_2PX)
-                        .children(candidates, blockInfo -> {
-                            Component stackName = blockInfo
-                                    .getItemStackForm().getHoverName();
-                            return new ToggleButton()
-                                    .value(new BoolValue.Dynamic(
-                                            () -> false,
-                                            (b) -> setPredicateDefaultBlock(predicateKey, blockInfo)))
-                                    .size(16)
-                                    .tooltip(r -> r.add(stackName))
-                                    .overlay(new ItemDrawable(
-                                            blockInfo.getItemStackForm()));
-                        }));
+                .menu(candidateGrid(candidates, blockInfo -> setPredicateDefaultBlock(predicateKey, blockInfo)));
+    }
+
+    /** The blocks a part can be, in rows as wide as they need to be, which beats one long column of them. */
+    private static Menu<?> candidateGrid(List<BlockInfo> candidates, Consumer<BlockInfo> choose) {
+        int columns = Mth.clamp((int) Math.ceil(Math.sqrt(candidates.size() * 1.5)), 3, 8);
+        int width = columns * 18 + 6;
+        return sizedMenu(width, list -> {
+            list.coverChildrenHeight().childSeparator(Icon.EMPTY_2PX);
+            for (int i = 0; i < candidates.size(); i += columns) {
+                Flow row = Flow.row().coverChildren().childPadding(2);
+                for (int j = i; j < Math.min(candidates.size(), i + columns); j++) {
+                    BlockInfo blockInfo = candidates.get(j);
+                    Component stackName = blockInfo.getItemStackForm().getHoverName();
+                    row.child(new ToggleButton()
+                            .value(new BoolValue.Dynamic(() -> false, b -> choose.accept(blockInfo)))
+                            .size(16)
+                            .tooltip(r -> r.add(stackName))
+                            .overlay(new ItemDrawable(blockInfo.getItemStackForm())));
+                }
+                list.child(row);
+            }
+        });
     }
 
     /// ==== Schema setup ====
@@ -619,9 +659,11 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
         multiblockSchemaInfo.selectStructure(name);
         rememberStructureChoice();
         selectionInfo = SelectionInfo.empty();
+        if (previewRenderer != null) previewRenderer.clearLayer("selection");
         yLevel = Integer.MAX_VALUE;
         selectedBlockHandler.notifyUpdate();
         patternsHandler.notifyUpdate();
+        keysHandler.notifyUpdate();
         applyFilters();
         if (schemaRenderer != null) {
             schemaRenderer.camera().setPosAndLookAt(0, 0, 0, multiblockSchemaInfo.getMapSchema().getCenter());
@@ -647,7 +689,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     private ButtonWidget<?> createStructuresButton() {
         ButtonWidget<?> button = new ButtonWidget<>();
         button.size(16)
-                .left(64)
+                .left(45)
                 .overlay(Text.str("S").asIcon())
                 .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.structures")))
                 .onMousePressed((context, mouse) -> {
@@ -734,6 +776,117 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     }
 
     /** Rebuilds the 3D view and the parts list after something that hides blocks changed: a layer or a variant. */
+    // *** the view's buttons ***
+
+    private ButtonWidget<?> createModeButton() {
+        return new ButtonWidget<>()
+                .overlay(new DynamicDrawable(() -> Text.dynamic(() -> Component.literal(mode.label)).scale(0.7f)
+                        .asIcon()))
+                .tooltipDynamic(r -> {
+                    r.addLine(Component.translatable("gtceu.multiblock.preview.mode"));
+                    r.addLine(Component.translatable(mode.tooltipKey));
+                })
+                .tooltipAutoUpdate(true)
+                .onMousePressed((c, b) -> {
+                    setPreviewMode(b == InputConstants.MOUSE_BUTTON_RIGHT ? mode.previous() : mode.next());
+                    return true;
+                });
+    }
+
+    private ButtonWidget<?> createRotateButton() {
+        return new ButtonWidget<>()
+                .overlay(Text.str("R").asIcon())
+                .tooltip(r -> {
+                    r.addLine(Component.translatable("gtceu.multiblock.preview.rotate"));
+                    r.addLine(Component.translatable("gtceu.multiblock.preview.rotate.hint"));
+                })
+                .onMousePressed((c, b) -> {
+                    rotate(b == InputConstants.MOUSE_BUTTON_RIGHT);
+                    return true;
+                });
+    }
+
+    private ButtonWidget<?> createGridButton() {
+        return new ButtonWidget<>()
+                .overlay(new DynamicDrawable(() -> Text.dynamic(() -> Component.literal(showGrid ? "G" : "g"))
+                        .asIcon()))
+                .tooltipDynamic(r -> {
+                    r.addLine(Component.translatable(showGrid ? "gtceu.multiblock.preview.grid.on" :
+                            "gtceu.multiblock.preview.grid.off"));
+                    int step = GRADUATION_STEPS[graduationIndex];
+                    r.addLine(step == 0 ? Component.translatable("gtceu.multiblock.preview.grid.no_marks") :
+                            Component.translatable("gtceu.multiblock.preview.grid.marks", step));
+                    r.addLine(Component.translatable("gtceu.multiblock.preview.grid.hint"));
+                })
+                .tooltipAutoUpdate(true)
+                .onMousePressed((c, b) -> {
+                    if (b == InputConstants.MOUSE_BUTTON_RIGHT) {
+                        graduationIndex = (graduationIndex + 1) % GRADUATION_STEPS.length;
+                        defaultGraduation = graduationIndex;
+                        // a marked grid is of no use when it is off
+                        if (!showGrid) {
+                            showGrid = true;
+                            defaultGrid = true;
+                        }
+                    } else {
+                        showGrid = !showGrid;
+                        defaultGrid = showGrid;
+                    }
+                    if (previewRenderer != null) {
+                        previewRenderer.setGrid(showGrid, GRADUATION_STEPS[graduationIndex]);
+                    }
+                    return true;
+                });
+    }
+
+    private ToggleButton createTurntableButton() {
+        return new ToggleButton()
+                .overlay(Text.str("T").asIcon())
+                .tooltip(r -> r.addLine(Component.translatable("gtceu.multiblock.preview.turntable")))
+                .value(new BoolValue.Dynamic(() -> turntable, on -> {
+                    turntable = on;
+                    defaultTurntable = on;
+                }));
+    }
+
+    /** How far the view has to be from the structure for all of it to be in it. */
+    private float fitDistance() {
+        var bounds = multiblockSchemaInfo.getMapSchema().getBounds();
+        if (bounds == null) return 10f;
+        double dx = bounds.getSecond().getX() - bounds.getFirst().getX() + 1;
+        double dy = bounds.getSecond().getY() - bounds.getFirst().getY() + 1;
+        double dz = bounds.getSecond().getZ() - bounds.getFirst().getZ() + 1;
+        // the view is 60 degrees, so a sphere round the structure fits at twice its radius, which is its diagonal
+        return (float) Math.max(3, Math.sqrt(dx * dx + dy * dy + dz * dz) * 1.15);
+    }
+
+    private void setPreviewMode(com.gregtechceu.gtceu.api.mui.PreviewMode newMode) {
+        this.mode = newMode;
+        defaultMode = newMode;
+        multiblockSchemaInfo.setPreviewMode(newMode);
+        refreshSchema();
+        notifyWidgetHandlers();
+    }
+
+    /** Turns the structure a quarter turn about the vertical, which the machine's rotation allows. */
+    private void rotate(boolean reverse) {
+        var rotation = multiblockDefinition.getRotationState();
+        if (rotation == com.gregtechceu.gtceu.api.data.RotationState.NONE) return;
+        Direction[] ring = { Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST };
+        // a machine that faces up or down is turned by which way its top points
+        boolean byUp = rotation == com.gregtechceu.gtceu.api.data.RotationState.Y_AXIS;
+        Direction current = byUp ? upFacing : frontFacing;
+        int index = Arrays.asList(ring).indexOf(current);
+        Direction next = ring[Math.floorMod((index < 0 ? 0 : index) + (reverse ? -1 : 1), ring.length)];
+        if (byUp) upFacing = next;
+        else frontFacing = next;
+        selectionInfo = SelectionInfo.empty();
+        if (previewRenderer != null) previewRenderer.clearLayer("selection");
+        refreshSchema();
+        selectedBlockHandler.notifyUpdate();
+        notifyWidgetHandlers();
+    }
+
     private void applyFilters() {
         refreshSchema();
         Reference2IntMap<Block> counts = new Reference2IntOpenHashMap<>();
@@ -757,7 +910,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     private ContextMenuButton<?> createVariantsMenu() {
         return new ContextMenuButton<>("variants")
                 .size(16)
-                .left(multiblockDefinition.getStructurePatterns().size() > 1 ? 83 : 64)
+                .left(multiblockDefinition.getStructurePatterns().size() > 1 ? 64 : 45)
                 .overlay(Text.str("V").asIcon())
                 .tooltip(r -> r.addLine(Component.translatable("gtceu.preview.variants")))
                 .requiresClick()
@@ -848,7 +1001,67 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
         return info.getBlockCounts();
     }
 
+    /** How many layers the structure has, from its lowest block to its highest. */
+    private int layerCount() {
+        var bounds = multiblockSchemaInfo.getMapSchema().getBounds();
+        if (bounds == null) return 1;
+        return bounds.getSecond().getY() - bounds.getFirst().getY() + 1;
+    }
+
+    /** The layer shown up to, from 1 for the lowest one; the last is all of them. */
+    private int currentLayer() {
+        return yLevel == Integer.MAX_VALUE ? layerCount() : yLevel - multiblockSchemaInfo.getMapSchema().getBounds()
+                .getFirst().getY() + 1;
+    }
+
+    private void setLayer(int layer) {
+        int count = layerCount();
+        int clamped = Mth.clamp(layer, 1, count);
+        int newLevel = clamped >= count ? Integer.MAX_VALUE :
+                multiblockSchemaInfo.getMapSchema().getBounds().getFirst().getY() + clamped - 1;
+        if (newLevel == yLevel) return;
+        yLevel = newLevel;
+        applyFilters();
+    }
+
+    /** Under the view: a slider for how many layers of the structure are shown, with the layer it is at. */
+    private IWidget createLayerSlider(int width) {
+        int count = layerCount();
+        if (count <= 1) return new EmptyWidget();
+        int labelWidth = Minecraft.getInstance().font.width(count + "/" + count) + 4;
+        return Flow.row()
+                .widthRel(1f)
+                .height(14)
+                .childPadding(3)
+                .crossAxisAlignment(Alignment.CrossAxis.CENTER)
+                .child(Text.lang("gtceu.multiblock.preview.layer.label").asWidget().height(10))
+                .child(new SliderWidget()
+                        .value(new brachy.modularui.value.DoubleValue.Dynamic(() -> currentLayer(),
+                                v -> setLayer((int) Math.round(v))))
+                        .bounds(1, count)
+                        .stopper(1)
+                        .width(Math.max(30, width - labelWidth - 52))
+                        .height(10)
+                        .tooltipDynamic(r -> {
+                            r.addLine(Component.translatable("gtceu.multiblock.preview.layer"));
+                            r.addLine(yLevel == Integer.MAX_VALUE ?
+                                    Component.translatable("gtceu.multiblock.preview.layer.all") :
+                                    Component.translatable("gtceu.multiblock.preview.layer.current",
+                                            currentLayer()));
+                        })
+                        .tooltipAutoUpdate(true))
+                .child(Text.dynamic(() -> Component.literal(currentLayer() + "/" + count)).asWidget()
+                        .width(labelWidth).height(10));
+    }
+
     private void notifyWidgetHandlers() {
+        // the slider is built again only when the structure has another number of layers: building it while it is
+        // dragged would drop the drag
+        if (layersHandler != null && multiblockSchemaInfo != null && multiblockSchemaInfo.getMapSchema() != null &&
+                layerCount() != shownLayerCount) {
+            shownLayerCount = layerCount();
+            layersHandler.notifyUpdate();
+        }
         if (partsViewWidget != null) {
             partsViewWidget.notifyUpdate((packet) -> {});
         }
@@ -978,9 +1191,31 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                 };
 
                 textField
-                        .value(new StringValue.Dynamic(() -> String.valueOf(syncValue.getIntValue()), $ -> {}));
+                        .value(new StringValue.Dynamic(() -> String.valueOf(syncValue.getIntValue()), text -> {
+                            try {
+                                syncValue.setIntValue(Mth.clamp(Integer.parseInt(text.trim()),
+                                        patternSlice.getMinRepeats(), patternSlice.getMaxRepeats()));
+                            } catch (NumberFormatException ignored) {}
+                        }));
 
-                col.child(textField.width(20).setNumbers(patternSlice.getMinRepeats(), patternSlice.getMaxRepeats()));
+                // - [n] +, as the old preview had
+                var minus = new ButtonWidget<>().size(12, 18).overlay(Text.str("-").asIcon())
+                        .onMousePressed((c, b) -> {
+                            syncValue.setIntValue(Mth.clamp(syncValue.getIntValue() - 1,
+                                    patternSlice.getMinRepeats(), patternSlice.getMaxRepeats()));
+                            return true;
+                        });
+                var plus = new ButtonWidget<>().size(12, 18).overlay(Text.str("+").asIcon())
+                        .onMousePressed((c, b) -> {
+                            syncValue.setIntValue(Mth.clamp(syncValue.getIntValue() + 1,
+                                    patternSlice.getMinRepeats(), patternSlice.getMaxRepeats()));
+                            return true;
+                        });
+                col.child(Flow.row().coverChildren().childPadding(1).crossAxisAlignment(Alignment.CrossAxis.CENTER)
+                        .child(minus)
+                        .child(textField.width(24).setNumbers(patternSlice.getMinRepeats(),
+                                patternSlice.getMaxRepeats()))
+                        .child(plus));
                 /*
                  * col.child(new SliderWidget()
                  * .background(GTGuiTextures.FLUID_SLOT)

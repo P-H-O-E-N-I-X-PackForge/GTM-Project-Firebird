@@ -62,10 +62,6 @@ public class MachineDefinition implements ItemLike {
 
     @Getter
     private final ResourceLocation id;
-    // This is only stored here for KJS use.
-    @Getter
-    @Nullable
-    private final String langValue;
     private final DeferredHolder<Block, ? extends MetaMachineBlock> blockHolder;
     @Setter(onMethod_ = @ApiStatus.Internal)
     private DeferredHolder<Item, ? extends MetaMachineItem> itemHolder;
@@ -131,11 +127,15 @@ public class MachineDefinition implements ItemLike {
         return globalRecipeModifier;
     }
 
+    /** The machine's own modifier, as it was registered, without the global ones. */
+    public RecipeModifier getBaseRecipeModifier() {
+        return recipeModifier;
+    }
+
     public MachineDefinition(ResourceLocation id, Properties properties) {
         this.id = id;
 
         this.rotationState = properties.rotationState();
-        this.langValue = properties.langValue();
         this.UI = properties.ui();
         this.themeId = properties.themeId();
         this.unresolvedRecipeTypes = properties.recipeTypes();
@@ -335,7 +335,5 @@ public class MachineDefinition implements ItemLike {
         private PanelFactory ui = null;
         private String themeId = ThemeAPI.DEFAULT_ID;
         private @Nullable Supplier<BlockState> appearance;
-        @Nullable
-        private String langValue = null;
     }
 }

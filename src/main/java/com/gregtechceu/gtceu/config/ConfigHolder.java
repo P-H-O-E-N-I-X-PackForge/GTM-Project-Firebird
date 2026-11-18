@@ -510,6 +510,13 @@ public class ConfigHolder {
 
         @Configurable
         @Configurable.Comment({
+                "Notice when a machine's @SyncToClient fields of simple types change, so that they reach the client",
+                "without the machine marking them as dirty. Turn off only to find out which field is not marked.",
+                "Default: true" })
+        public boolean autoDetectSyncChanges = true;
+
+        @Configurable
+        @Configurable.Comment({
                 "Whether to require a Wrench, Wirecutter, or other GregTech tools to break machines, casings, wires, and more.",
                 "Default: true" })
         @Configurable.UpdateRestriction(UpdateRestrictions.MAIN_MENU)
@@ -886,8 +893,8 @@ public class ConfigHolder {
 
         @Configurable
         @Configurable.Comment({
-                "Show recipe durations of a minute or more as mm:dd:hh:mm:ss on recipe pages (months, days, hours,",
-                "minutes, seconds; a month is 30 days) instead of only seconds: '00:00:02:05:12' and not '7512 secs'.",
+                "Show recipe durations of two minutes or more as a clock on recipe pages instead of only seconds, with",
+                "only the parts that are needed: '2:05:12', '3d 4:00:00', '41m 12d 18:09:42.35'. A month is 30 days.",
                 "Default: false" })
         public boolean recipeDurationHoursMinutes = false;
         @Configurable

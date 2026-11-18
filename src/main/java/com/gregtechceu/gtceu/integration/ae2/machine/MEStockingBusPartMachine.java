@@ -3,6 +3,7 @@ package com.gregtechceu.gtceu.integration.ae2.machine;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
 import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
 import com.gregtechceu.gtceu.config.ConfigHolder;
@@ -364,6 +365,16 @@ public class MEStockingBusPartMachine extends MEInputBusPartMachine implements I
                         ItemStack resultStack = key instanceof AEItemKey itemKey ?
                                 itemKey.toStack((int) extracted) : ItemStack.EMPTY;
                         if (!simulate) {
+                            // put back into the network if the recipe this is the input of does not go through
+                            var previousStock = this.stock;
+                            RecipeTransaction.record(() -> {
+                                aeNetwork.insert(key, extracted, Actionable.MODULATE,
+                                        stockingBusPartMachine.actionSource);
+                                this.stock = previousStock;
+                                if (this.onContentsChanged != null) {
+                                    this.onContentsChanged.run();
+                                }
+                            });
                             // may as well update the display here
                             this.stock = ExportOnlyAESlot.copy(stock, stock.amount() - extracted);
                             if (this.stock.amount() == 0) {

@@ -102,6 +102,10 @@ public class MultiblockSchemaInfo {
     @Getter
     @Setter
     private boolean flipped;
+    /** How the preview shows the multiblock: formed, not formed or running. */
+    @Getter
+    @Setter
+    private PreviewMode previewMode = PreviewMode.FORMED;
     @Getter
     @Setter
     private boolean ignorePreviewCount;
@@ -123,6 +127,8 @@ public class MultiblockSchemaInfo {
 
     public MultiblockSchemaInfo(MultiblockMachineDefinition definition) {
         this.definition = definition;
+        // additions are shown and built with the main structure unless the player switches them off
+        this.overlays.addAll(definition.getAdditionStructures());
         this.userSliceRepeats = new Int2IntArrayMap();
         this.userDimensions = new IntArrayList();
         this.userGlobalBlockPreferences = new Object2ObjectOpenHashMap<>();
@@ -253,12 +259,10 @@ public class MultiblockSchemaInfo {
         }
         if (this.mapSchema == null) {
             this.mapSchema = new MutableSchema();
-            this.mapSchema.setStructureName(structure);
-            this.mapSchema.setBlocks(schemaMap);
-        } else {
-            this.mapSchema.setStructureName(structure);
-            this.mapSchema.setBlocks(schemaMap);
         }
+        this.mapSchema.setStructureName(structure);
+        this.mapSchema.setPreviewMode(previewMode);
+        this.mapSchema.setBlocks(schemaMap);
         this.structureBlocks.clear();
         this.structureBlocks.putAll(resultStructure);
 
@@ -267,8 +271,12 @@ public class MultiblockSchemaInfo {
         }
     }
 
-    private void addOverlays(Map<BlockPos, BlockInfo> resultStructure, Direction frontFacing, Direction upFacing,
-                             boolean isFlipped) {
+    /**
+     * Adds the blocks of the structures layered on the selected one to {@code resultStructure}, each aligned on the
+     * controller. Used by the preview, which calls it itself, and by whatever builds the structure from that result.
+     */
+    public void addOverlays(Map<BlockPos, BlockInfo> resultStructure, Direction frontFacing, Direction upFacing,
+                            boolean isFlipped) {
         if (overlays.isEmpty()) return;
         var controllerBlock = definition.getBlock();
         BlockPos baseController = controllerPosition(resultStructure, controllerBlock);
@@ -301,7 +309,8 @@ public class MultiblockSchemaInfo {
         }
     }
 
-    private static BlockPos controllerPosition(Map<BlockPos, BlockInfo> structure, net.minecraft.world.level.block.Block controller) {
+    private static BlockPos controllerPosition(Map<BlockPos, BlockInfo> structure,
+                                               net.minecraft.world.level.block.Block controller) {
         for (var entry : structure.entrySet()) {
             if (entry.getValue().getBlockState().is(controller)) return entry.getKey();
         }
@@ -311,7 +320,8 @@ public class MultiblockSchemaInfo {
     @Override
     public int hashCode() {
         return Objects.hash(definition.getId(), blockCounts, userGlobalBlockPreferences,
-                blockPreferences, minMaxPreferences, userSliceRepeats, userDimensions, flipped, ignorePreviewCount, structure, overlays);
+                blockPreferences, minMaxPreferences, userSliceRepeats, userDimensions, flipped, ignorePreviewCount,
+                structure, overlays);
     }
 
     @Override

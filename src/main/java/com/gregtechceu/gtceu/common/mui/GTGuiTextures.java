@@ -68,6 +68,12 @@ public interface GTGuiTextures {
             .defaultColorType()
             .build();
 
+    UITexture TITLE_BAR_BACKGROUND = UITexture.builder()
+            .location(GTCEu.MOD_ID, "textures/gui/base/title_bar_background.png")
+            .imageSize(16, 16)
+            .adaptable(4)
+            .build();
+
     UITexture BACKGROUND_POPUP = UITexture.builder()
             .location(GTCEu.MOD_ID, "textures/gui/base/background_popup.png")
             .imageSize(195, 136)

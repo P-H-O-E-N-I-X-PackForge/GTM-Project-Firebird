@@ -134,6 +134,22 @@ public class GTCommands {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                                             return setActiveCape(ctx.getSource(), player, null);
                                         }))))
+                .then(literal("debug")
+                        .requires(ctx -> ctx.hasPermission(LEVEL_ADMINS))
+                        .then(literal("machine")
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    var hit = player.pick(8, 0, false);
+                                    if (!(hit instanceof net.minecraft.world.phys.BlockHitResult block) ||
+                                            !(com.gregtechceu.gtceu.api.machine.MetaMachine.getMachine(player.level(),
+                                                    block.getBlockPos()) instanceof com.gregtechceu.gtceu.api.machine.MetaMachine machine)) {
+                                        ctx.getSource().sendFailure(Component.literal("Look at a machine."));
+                                        return 0;
+                                    }
+                                    MachineDebugReport.of(machine, false)
+                                            .forEach(line -> ctx.getSource().sendSuccess(() -> line, false));
+                                    return 1;
+                                })))
                 .then(literal("share_prospection_data")
                         .then(argument("player", EntityArgument.player())
                                 .executes(ctx -> {

@@ -4,6 +4,7 @@ import com.gregtechceu.gtceu.api.block.MetaMachineBlock;
 import com.gregtechceu.gtceu.api.block.property.GTBlockStateProperties;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.events.MultiblockFormEvent;
+import com.gregtechceu.gtceu.api.events.MultiblockStructureEvent;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
@@ -27,7 +28,6 @@ import com.gregtechceu.gtceu.common.mui.GTGuiTextures;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.ExtendedUseOnContext;
 
-import net.neoforged.neoforge.common.NeoForge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.TickTask;
@@ -35,6 +35,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.NeoForge;
 
 import brachy.modularui.api.widget.IWidget;
 import brachy.modularui.drawable.Icon;
@@ -88,6 +89,9 @@ public class MultiblockControllerMachine extends MetaMachine {
     protected static final Table<MultiblockMachineDefinition, String, IBlockPattern> structurePatterns = HashBasedTable
             .create();
     protected final Object2ObjectMap<String, PatternState> patternStates = new Object2ObjectOpenHashMap<>();
+    /** The names of the structures that are formed, comma separated, so that the client knows them too. */
+    @SyncToClient
+    private String formedStructureNames = "";
 
     public MultiblockControllerMachine(BlockEntityCreationInfo info) {
         super(info);
@@ -233,6 +237,35 @@ public class MultiblockControllerMachine extends MetaMachine {
      *
      * @return set of substructures used by controller
      */
+    private void refreshFormedStructures() {
+        if (isRemote()) return;
+        java.util.TreeSet<String> names = new java.util.TreeSet<>();
+        for (var entry : patternStates.entrySet()) {
+            if (entry.getValue().isFormed()) names.add(entry.getKey());
+        }
+        formedStructureNames = String.join(",", names);
+    }
+
+    /**
+     * The structures that are formed now. Works on the client too, where the pattern states themselves are not
+     * available.
+     */
+    public Set<String> getFormedStructures() {
+        if (!isRemote()) {
+            java.util.Set<String> names = new java.util.TreeSet<>();
+            for (var entry : patternStates.entrySet()) {
+                if (entry.getValue().isFormed()) names.add(entry.getKey());
+            }
+            return names;
+        }
+        return formedStructureNames.isEmpty() ? Set.of() : Set.of(formedStructureNames.split(","));
+    }
+
+    /** Whether the named structure is formed, on the server and on the client. */
+    public boolean isStructureFormed(String structureName) {
+        return getFormedStructures().contains(structureName);
+    }
+
     public Set<String> getStructureNames() {
         return structurePatterns.row(this.getDefinition()).keySet();
     }
@@ -271,7 +304,8 @@ public class MultiblockControllerMachine extends MetaMachine {
 
     /**
      * The structures whose errors the controller's UI reports while it is not formed. All of them by default; a
-     * multiblock whose structures are alternatives, such as tiers, can narrow it to the ones that are meant to be built.
+     * multiblock whose structures are alternatives, such as tiers, can narrow it to the ones that are meant to be
+     * built.
      */
     public java.util.Collection<String> getErrorReportStructures() {
         return getStructurePatterns().keySet();
@@ -311,7 +345,21 @@ public class MultiblockControllerMachine extends MetaMachine {
         return state;
     }
 
+    /**
+     * Forms the structure, if it is valid and nothing stops it. See {@link #isStructureFormed}.
+     */
     public void formStructure(String substructureName) {
+        PatternState before = getPatternState(substructureName);
+        boolean wasFormed = before != null && before.isFormed();
+        formStructureInternal(substructureName);
+        refreshFormedStructures();
+        PatternState after = getPatternState(substructureName);
+        if (!wasFormed && after != null && after.isFormed() && getLevel() instanceof ServerLevel) {
+            NeoForge.EVENT_BUS.post(new MultiblockStructureEvent.Formed(this, substructureName));
+        }
+    }
+
+    private void formStructureInternal(String substructureName) {
         if (getLevel() instanceof ServerLevel serverLevel) {
             var event = NeoForge.EVENT_BUS.post(new MultiblockFormEvent(this, substructureName));
             if (event.isCanceled()) {
@@ -338,6 +386,8 @@ public class MultiblockControllerMachine extends MetaMachine {
 
         if (patternState.isFormed()) {
             if (patternState.getState() == PatternState.CheckState.VALID_UNCACHED) {
+                // the parts this structure adds: the ones the others have are theirs, with their names
+                List<MultiblockPartMachine> addedParts = new ArrayList<>();
                 forEachMultiPart(substructureName, part -> {
                     if (parts.contains(part)) return true;
 
@@ -348,6 +398,7 @@ public class MultiblockControllerMachine extends MetaMachine {
 
                     if (shouldAddPartToController(part)) {
                         this.parts.add(part);
+                        addedParts.add(part);
                     }
                     return true;
                 });
@@ -357,6 +408,10 @@ public class MultiblockControllerMachine extends MetaMachine {
                     if (part instanceof ParallelHatchPartMachine pHatch) {
                         this.parallelHatch = pHatch;
                     }
+                }
+                // only these are told they are in this structure: telling them all gave the parts of the other
+                // structures this one's name, and taking this one down then took them with it
+                for (var part : addedParts) {
                     part.addedToController(this, substructureName);
                 }
                 updatePartPositions();
@@ -420,7 +475,20 @@ public class MultiblockControllerMachine extends MetaMachine {
         getSyncDataHolder().markClientSyncFieldDirty("isFormed");
     }
 
+    /**
+     * Breaks the structure: its parts are let go and it is no longer formed.
+     */
     public void invalidateStructure(String name) {
+        PatternState before = getPatternState(name);
+        boolean wasFormed = before != null && before.isFormed();
+        invalidateStructureInternal(name);
+        refreshFormedStructures();
+        if (wasFormed && getLevel() instanceof ServerLevel) {
+            NeoForge.EVENT_BUS.post(new MultiblockStructureEvent.Invalidated(this, name));
+        }
+    }
+
+    private void invalidateStructureInternal(String name) {
         var pState = patternStates.get(name);
 
         // only the default structure decides how the controller looks: another structure failing its check, as the

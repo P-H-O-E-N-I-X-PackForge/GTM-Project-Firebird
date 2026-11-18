@@ -10,7 +10,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Posted on the game event bus, on the server, after a machine finishes a recipe cycle. For multiblocks it comes after
- * the parts have been told.
+ * the parts have been told. It is posted from the machine's {@code afterWorking}, so it also comes when a running
+ * recipe is interrupted; listen to {@link MachineRecipeStatusEvent} to tell the two apart.
  */
 public class MachineRecipeFinishedEvent extends Event {
 

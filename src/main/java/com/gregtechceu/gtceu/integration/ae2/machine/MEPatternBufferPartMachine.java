@@ -19,6 +19,7 @@ import com.gregtechceu.gtceu.api.machine.trait.notifiable.NotifiableRecipeHandle
 import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeHandlerGroupDistinctness;
 import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeHandlerList;
 import com.gregtechceu.gtceu.api.recipe.GTRecipe;
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.recipe.ingredient.SizedIngredientExtensions;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
@@ -1135,6 +1136,12 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                         count -= extracted;
                         if (count == 0) it2.remove();
                         else entry.setValue(count);
+                        // given back if the recipe this is the input of does not go through
+                        final int taken = extracted;
+                        RecipeTransaction.record(() -> {
+                            itemInventory.addTo(stack, taken);
+                            onContentsChanged();
+                        });
                     }
                     amount -= extracted;
 
@@ -1183,6 +1190,12 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                         count -= extracted;
                         if (count == 0) it2.remove();
                         else entry.setValue(count);
+                        // given back if the recipe this is the input of does not go through
+                        final int taken = extracted;
+                        RecipeTransaction.record(() -> {
+                            fluidInventory.addTo(stack, taken);
+                            onContentsChanged();
+                        });
                     }
                     amount -= extracted;
 

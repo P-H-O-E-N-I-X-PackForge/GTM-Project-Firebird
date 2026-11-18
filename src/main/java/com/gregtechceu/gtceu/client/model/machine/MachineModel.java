@@ -304,6 +304,7 @@ public final class MachineModel extends BaseBakedModel implements ICoverableRend
         // render covers
         ICoverableRenderer.super.renderCovers(quads, machine.getCoverContainer(), pos, level,
                 side, rand, modelData, renderType);
+        MachineModelOverlays.apply(machine, side, renderType, rand, modelData, quads);
         return quads;
     }
 
