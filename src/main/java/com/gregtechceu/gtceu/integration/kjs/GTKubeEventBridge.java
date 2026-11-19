@@ -35,11 +35,20 @@ public final class GTKubeEventBridge {
         }
     }
 
+    // NeoForge's bus refuses a listener for an abstract event, so each of the two events has its own
     @SubscribeEvent
-    public static void onStructure(MultiblockStructureEvent event) {
+    public static void onStructureFormed(MultiblockStructureEvent.Formed event) {
+        postStructure(GTCEuServerEvents.STRUCTURE_FORMED, event);
+    }
+
+    @SubscribeEvent
+    public static void onStructureInvalidated(MultiblockStructureEvent.Invalidated event) {
+        postStructure(GTCEuServerEvents.STRUCTURE_INVALIDATED, event);
+    }
+
+    private static void postStructure(dev.latvian.mods.kubejs.event.EventHandler handler,
+                                      MultiblockStructureEvent event) {
         try {
-            var handler = event instanceof MultiblockStructureEvent.Formed ? GTCEuServerEvents.STRUCTURE_FORMED :
-                    GTCEuServerEvents.STRUCTURE_INVALIDATED;
             if (handler.hasListeners()) handler.post(ScriptType.SERVER, new MultiblockStructureEventJS(event));
         } catch (Throwable t) {
             GTCEu.LOGGER.error("A structure script failed", t);
