@@ -55,6 +55,27 @@ public class MaterialProperties {
         propertyMap.remove(PropertyKey.EMPTY);
     }
 
+    /**
+     * Sets a property, replacing the one the material already has for this key if there is one.
+     * {@link #setProperty} refuses to, so changing a property used to mean removing it and adding it again.
+     */
+    public <T extends IMaterialProperty> void replaceProperty(PropertyKey<T> key, T value) {
+        if (value == null) throw new IllegalArgumentException("Material Property must not be null!");
+        if (!key.getType().isInstance(value))
+            throw new IllegalArgumentException("Material Property must be of the same type as the property key!");
+        propertyMap.put(key, value);
+        propertyMap.remove(PropertyKey.EMPTY);
+    }
+
+    /**
+     * Changes the material's property for this key in place, creating a default one first if it has none.
+     */
+    public <T extends IMaterialProperty> T modifyProperty(PropertyKey<T> key, java.util.function.Consumer<T> modifier) {
+        T property = ensureSet(key);
+        modifier.accept(property);
+        return property;
+    }
+
     public <T extends IMaterialProperty> void removeProperty(PropertyKey<T> property) {
         if (!hasProperty(property))
             throw new IllegalArgumentException("Material Property " + property.toString() + " not present!");

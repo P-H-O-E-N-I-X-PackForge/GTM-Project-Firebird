@@ -2,6 +2,12 @@ package com.gregtechceu.gtceu.client.mui.schema;
 
 import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
 import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
+import com.gregtechceu.gtceu.api.machine.MetaMachine;
+import com.gregtechceu.gtceu.api.machine.feature.IRecipeLogicMachine;
+import com.gregtechceu.gtceu.api.machine.property.GTMachineModelProperties;
+import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic;
+import com.gregtechceu.gtceu.api.block.property.GTBlockStateProperties;
+import com.gregtechceu.gtceu.api.mui.PreviewMode;
 import com.gregtechceu.gtceu.api.multiblock.pattern.PatternState;
 
 import net.minecraft.core.BlockPos;
@@ -16,6 +22,7 @@ import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -39,6 +46,14 @@ public class MutableSchema implements ISchema {
 
     @Getter
     protected final Long2ReferenceMap<BlockState> blocks = new Long2ReferenceOpenHashMap<>();
+
+    /** The structure of the multiblock this holds, which is the one formed in it. */
+    @Setter
+    private String structureName = DEFAULT_STRUCTURE;
+
+    /** Whether the controller is formed when the blocks are set, and whether it is shown working. */
+    @Setter
+    private PreviewMode previewMode = PreviewMode.FORMED;
 
     public MutableSchema() {}
 
@@ -78,11 +93,30 @@ public class MutableSchema implements ISchema {
             }
         }
 
-        if (controller != null) {
-            PatternState patternState = controller.getPatternState(DEFAULT_STRUCTURE);
-            controller.checkStructurePattern(DEFAULT_STRUCTURE);
+        if (controller != null && previewMode != PreviewMode.UNFORMED) {
+            PatternState patternState = controller.getPatternState(structureName);
+            controller.checkStructurePattern(structureName);
             if (patternState.getState().isValid()) {
-                controller.formStructure(DEFAULT_STRUCTURE);
+                controller.formStructure(structureName);
+                if (previewMode == PreviewMode.ACTIVE) {
+                    showWorking(controller);
+                    for (var part : parts) showWorking(part);
+                    // what a running recipe does: the logic is working, which the renders of the machine read, and
+                    // the machine turns its active blocks on and its parts to the working look
+                    controller.getTraitOptional(RecipeLogic.class).ifPresent(RecipeLogic::showWorkingForPreview);
+                    if (controller instanceof IRecipeLogicMachine machine) {
+                        machine.recipeLogicStatusChanged(RecipeLogic.Status.IDLE, RecipeLogic.Status.WORKING);
+                    }
+                    // the view draws the blocks of this map, not those of the level, which the machine just changed
+                    // (this.blocks: the parameter of this method has the same name, and is not what is drawn)
+                    for (long packed : this.blocks.keySet().toLongArray()) {
+                        var current = getLevel().getBlockState(BlockPos.of(packed));
+                        if (current != this.blocks.get(packed) &&
+                                current.hasProperty(GTBlockStateProperties.ACTIVE)) {
+                            this.blocks.put(packed, current);
+                        }
+                    }
+                }
             }
         }
 
@@ -90,6 +124,17 @@ public class MutableSchema implements ISchema {
         this.center = BlockPosUtil.getCenterF(min, max);
         this.bounds = Pair.of(min, max);
         return this;
+    }
+
+    /**
+     * Has the machine look as it does while a recipe runs. The recipe logic does not run here, so only how it looks.
+     */
+    private static void showWorking(MetaMachine machine) {
+        var state = machine.getRenderState();
+        var property = GTMachineModelProperties.RECIPE_LOGIC_STATUS;
+        if (state.hasProperty(property)) {
+            machine.setRenderState(state.setValue(property, RecipeLogic.Status.WORKING));
+        }
     }
 
     public MutableSchema updateBlockState(BlockPos pos, BlockState state) {

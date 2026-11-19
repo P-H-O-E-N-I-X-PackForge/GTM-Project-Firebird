@@ -16,16 +16,16 @@ import com.gregtechceu.gtceu.utils.FormattingUtil;
 
 import net.minecraft.network.chat.Component;
 
-import brachy.modularui.drawable.ItemDrawable;
 import brachy.modularui.drawable.UITexture;
 import brachy.modularui.factory.PosGuiData;
+import brachy.modularui.factory.SidedPosGuiData;
 import brachy.modularui.screen.UISettings;
 import brachy.modularui.utils.Color;
 import brachy.modularui.value.sync.DoubleSyncValue;
 import brachy.modularui.value.sync.IntSyncValue;
 import brachy.modularui.value.sync.PanelSyncManager;
 import brachy.modularui.widget.ParentWidget;
-import brachy.modularui.widgets.ButtonWidget;
+import brachy.modularui.widget.Widget;
 import brachy.modularui.widgets.layout.Flow;
 import lombok.Getter;
 import lombok.Setter;
@@ -63,6 +63,12 @@ public class MachineUIPanelBuilder {
      * the machine supports them.
      */
     private boolean addDefaultConfigurators = true;
+    /**
+     * Whether a multiblock controller's UI reports why it has not formed, under its main contents, the way the
+     * standard multiblock UIs do. Standard multiblocks already do this in their main contents; this is for UIs that
+     * build their own.
+     */
+    private boolean showPatternErrors = false;
     private final MetaMachine machine;
 
     @Getter
@@ -76,11 +82,16 @@ public class MachineUIPanelBuilder {
     }
 
     public MachineUIPanel build(PosGuiData data, PanelSyncManager syncManager, UISettings settings) {
-        var panel = new MachineUIPanel(machine, data, settings, attachInventory, addTitleBar, drawGTLogo,
+        boolean hasSides = addDefaultConfigurators && com.gregtechceu.gtceu.common.mui.GTMuiSides.applies(machine);
+        // the title bar over the panel is the navigation's, with the back button and the page switcher
+        var nav = hasSides ? new com.gregtechceu.gtceu.common.mui.GTMuiNav(machine, true, syncManager) : null;
+        var panel = new MachineUIPanel(machine, data, settings, attachInventory, addTitleBar && nav == null,
+                drawGTLogo,
                 gtLogoTexture);
 
         var attachLeft = panel.getLeftConfiguratorPanel();
-        var attachRight = panel.getRightConfiguratorPanel();
+        // all the side columns are on the left; the right column is where the Wiki's HUD tabs used to be too
+        var attachRight = attachLeftForRight(panel);
         var attachMain = panel.getMainContents();
 
         if (addDefaultConfigurators) {
@@ -114,6 +125,95 @@ public class MachineUIPanelBuilder {
         leftConfigurators.accept(attachLeft);
         rightConfigurators.accept(attachRight);
         mainContents.accept(attachMain);
+
+        if (nav != null) {
+            // the sides page and the page switcher take the place of the main contents while they are on
+            var column = panel.getContentsColumn();
+            final int inventoryHeight = attachInventory ? 0 : 78;
+            final int mainPage = com.gregtechceu.gtceu.common.mui.GTMuiNav.MAIN;
+            ParentWidget<?> sidesInner = null;
+            Widget<?> sidesPage = null;
+            if (hasSides) {
+                sidesInner = com.gregtechceu.gtceu.common.mui.GTMuiSides.page(machine, data, syncManager, settings);
+                sidesPage = sidesInner;
+                if (!attachInventory) {
+                    // a machine UI without the player inventory (the HUD ones) gets one under the sides page
+                    sidesPage = Flow.col().coverChildren().childPadding(2).child(sidesInner)
+                            .child(brachy.modularui.widgets.SlotGroupWidget.playerInventory((index, slot) -> slot)
+                                    .marginTop(1).marginBottom(3));
+                }
+                sidesPage.setEnabledIf(
+                        w -> !machine.isRemote() || nav.page() == com.gregtechceu.gtceu.common.mui.GTMuiNav.SIDES);
+            }
+            ParentWidget<?> pagesPage = nav.pagesPage();
+            pagesPage.setEnabledIf(
+                    w -> !machine.isRemote() || nav.page() == com.gregtechceu.gtceu.common.mui.GTMuiNav.PAGES);
+
+            // the pages are as big as the main contents they replace, as the tabs were in the old machine UI
+            int[] mainSize = { 0, 0 };
+            int[] asked = { 0, 0, 0, 0 };
+            final ParentWidget<?> sizedSides = sidesInner;
+            panel.child(new Widget<>().size(0, 0).onUpdateListener(w -> {
+                if (nav.page() == mainPage) {
+                    var area = attachMain.getArea();
+                    if (area.w() > 0 && area.h() > 0) {
+                        mainSize[0] = area.w();
+                        mainSize[1] = area.h();
+                    }
+                }
+                if (mainSize[0] <= 0) return;
+                // asked for once for each size: a page that is off keeps the area it had, so its area is no guide to
+                // this
+                int sidesHeight = Math.max(MachineUIPanel.DEFAULT_CONTENT_HEIGHT, mainSize[1] - inventoryHeight);
+                if (sizedSides != null && (asked[0] != mainSize[0] || asked[1] != sidesHeight)) {
+                    asked[0] = mainSize[0];
+                    asked[1] = sidesHeight;
+                    sizedSides.size(mainSize[0], sidesHeight);
+                    sizedSides.scheduleResize();
+                }
+                // the page switcher has no player inventory, so it takes the room of it
+                int pagesHeight = mainSize[1] + (attachInventory ? 78 : 0);
+                if (asked[2] != mainSize[0] || asked[3] != pagesHeight) {
+                    asked[2] = mainSize[0];
+                    asked[3] = pagesHeight;
+                    pagesPage.size(mainSize[0], pagesHeight);
+                    pagesPage.scheduleResize();
+                }
+            }));
+            attachMain.setEnabledIf(w -> !machine.isRemote() || nav.page() == mainPage);
+            column.collapseDisabledChildren();
+            // what is enabled is laid out again when the page changes, or a tab that was off is left with no room
+            panel.setShowMainPage(nav::toMain);
+            nav.onPageChanged(() -> {
+                column.scheduleResize();
+                attachRight.scheduleResize();
+                panel.scheduleResize();
+            });
+            int at = Math.min(1, column.getChildren().size());
+            if (sidesPage != null) column.child(at, sidesPage);
+            column.child(at, pagesPage);
+            if (attachInventory) {
+                for (var child : column.getChildren()) {
+                    if (child instanceof brachy.modularui.widgets.SlotGroupWidget) {
+                        ((Widget<?>) child).setEnabledIf(
+                                w -> !machine.isRemote() ||
+                                        nav.page() != com.gregtechceu.gtceu.common.mui.GTMuiNav.PAGES);
+                    }
+                }
+            }
+            // added last, so it is the top one of the left column: the main tab over the sides tab
+            var sidesTab = nav.sidesTab();
+            if (sidesTab != null) attachRight.child(sidesTab);
+            attachRight.child(nav.mainTab());
+            if (machine.isRemote()) panel.child(nav.titleBar());
+        }
+
+        if (showPatternErrors &&
+                machine instanceof com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine controller) {
+            // under the main contents, above the player inventory; the widget takes no room while there are no errors
+            panel.getContentsColumn().child(1,
+                    com.gregtechceu.gtceu.common.mui.GTMultiblockTextUtil.addUnformedWarning(controller, syncManager));
+        }
 
         if (addTraitConfigurators) {
             for (var attachConfiguratorsTrait : machine.getTraitHolder()
@@ -161,14 +261,27 @@ public class MachineUIPanelBuilder {
         }
 
         for (var cover : machine.getCoverContainer().getCovers()) {
-            attachLeft.child(new ButtonWidget<>()
-                    .overlay(new ItemDrawable(cover.getAttachItem()))
-                    .onMousePressed((context, button) -> {
-                        return true;
-                    }));
+            GTMuiWidgets.createCoverWidget(attachLeft, cover,
+                    new SidedPosGuiData(data.getPlayer(), data.getBlockPos(), cover.attachedSide), syncManager,
+                    settings);
         }
 
+        MachineUIExtensions.apply(machine, syncManager, panel);
+
         return panel;
+    }
+
+    /**
+     * Makes the panel report a multiblock controller's pattern errors under its main contents. See
+     * {@code MultiblockControllerMachine#getErrorReportStructures}.
+     */
+    public MachineUIPanelBuilder showPatternErrors() {
+        this.showPatternErrors = true;
+        return this;
+    }
+
+    private static Flow attachLeftForRight(MachineUIPanel panel) {
+        return panel.getLeftConfiguratorPanel();
     }
 
     public static MachineUIPanelBuilder panelBuilder(MetaMachine machine) {

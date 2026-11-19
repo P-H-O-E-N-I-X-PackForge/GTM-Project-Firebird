@@ -1,5 +1,6 @@
 package com.gregtechceu.gtceu.integration.ae2.machine;
 
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
 import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
@@ -349,6 +350,15 @@ public class MEStockingHatchPartMachine extends MEInputHatchPartMachine implemen
                     FluidStack resultStack = key instanceof AEFluidKey fluidKey ?
                             AEUtil.toFluidStack(fluidKey, extracted) : FluidStack.EMPTY;
                     if (action.execute()) {
+                        // put back into the network if the recipe this is the input of does not go through
+                        var previousStock = this.stock;
+                        RecipeTransaction.record(() -> {
+                            aeNetwork.insert(key, extracted, Actionable.MODULATE, actionSource);
+                            this.stock = previousStock;
+                            if (this.onContentsChanged != null) {
+                                this.onContentsChanged.run();
+                            }
+                        });
                         // may as well update the display here
                         this.stock = ExportOnlyAESlot.copy(stock, stock.amount() - extracted);
                         if (this.stock.amount() == 0) {

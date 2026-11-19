@@ -20,6 +20,8 @@ import net.minecraftforge.fml.loading.FMLLoader;
 import brachy.modularui.api.drawable.IDrawable;
 import brachy.modularui.api.drawable.Text;
 import brachy.modularui.api.widget.IWidget;
+import brachy.modularui.screen.viewport.ModularGuiContext;
+import brachy.modularui.theme.WidgetThemeEntry;
 import brachy.modularui.utils.Alignment;
 import brachy.modularui.utils.MouseData;
 import brachy.modularui.value.DoubleValue;
@@ -27,16 +29,18 @@ import brachy.modularui.widget.ParentWidget;
 import brachy.modularui.widget.WidgetTree;
 import brachy.modularui.widgets.ButtonWidget;
 import brachy.modularui.widgets.layout.Flow;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import static com.gregtechceu.gtceu.api.GTValues.ULV;
 import static com.gregtechceu.gtceu.api.GTValues.V;
 
-public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
+public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> implements SizeAwareWidget {
 
     private final GTRecipe baseRecipe;
 
@@ -45,8 +49,11 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
     private final GTRecipeType recipeType;
     private final GTRecipeTypeUILayout uiLayout;
 
+    // These cover their width too: with a width taken from the panel, a long line (a condition's text, say) did not
+    // widen
+    // the panel and ran out of its frame.
     public final Flow textComponents = Flow.col()
-            .widthRel(1f)
+            .coverChildrenWidth(0)
             .coverChildrenHeight()
             .childPadding(1)
             .crossAxisAlignment(Alignment.CrossAxis.START)
@@ -55,12 +62,15 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
     public final Flow inputColumn = Flow.col().coverChildren().crossAxisAlignment(Alignment.CrossAxis.START);
     public final Flow outputColumn = Flow.col().coverChildren().crossAxisAlignment(Alignment.CrossAxis.START);
 
-    public final Flow recipeContentRow;
+    public final ParentWidget<?> recipeContentRow;
     public final ParentWidget<?> additionalRecipeContent = new ParentWidget<>()
-            .coverChildrenHeight().widthRel(1f);
+            .coverChildrenHeight().coverChildrenWidth(0);
 
     private final int minTier;
     private int tier;
+
+    private @Nullable BiConsumer<Integer, Integer> sizeListener;
+    private int lastWidth = -1, lastHeight = -1;
 
     public GTRecipeViewerWidget(GTRecipe recipe) {
         this.baseRecipe = recipe;
@@ -71,25 +81,28 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
         this.minTier = RecipeHelper.getRecipeEUtTier(recipe);
         this.tier = minTier;
 
-        Flow mainColumn = Flow.col().widthRel(1f).coverChildrenHeight();
+        // Covers its width too, with a minimum: a column that took its width from the panel left the panel at the
+        // minimum width however wide the slots and text inside it were, so wide pages overflowed their frame.
+        // Its children start at its left edge. They were centered, which put the text rows of a wide page, such as a
+        // fusion or blast furnace recipe, far over to the right of the slots instead of under them.
+        Flow mainColumn = Flow.col().coverChildrenWidth(150).coverChildrenHeight()
+                .crossAxisAlignment(Alignment.CrossAxis.START);
 
         child(mainColumn);
-        margin(3);
+        margin(2, 2, 2, 1);
         coverChildrenWidth(150);
         coverChildrenHeight(60);
 
         // Attach duration here so it is always the first text row
         textComponents.child(Text
-                .dynamic(() -> Component.translatable("gtceu.recipe.duration",
-                        FormattingUtil.formatNumbers((double) modifiedRecipe.duration / 20)))
+                .dynamic(() -> FormattingUtil.formatRecipeDuration(modifiedRecipe.duration))
                 .asWidget()
                 .setEnabledIf(v -> !modifiedRecipe.data.getBoolean("hide_duration")));
 
         recipeContentRow = uiLayout.getCustomUIBuilder() == null ? buildDefaultLayout() :
-                uiLayout.getCustomUIBuilder().apply(recipe);
+                uiLayout.getCustomUIBuilder().buildMainRow(this, uiLayout, recipe);
 
-        mainColumn.child(recipeContentRow.coverChildrenWidth().marginTop(5).marginBottom(3)
-                .paddingLeft(2).paddingRight(2));
+        mainColumn.child(recipeContentRow.marginTop(2).marginBottom(3));
         mainColumn.child(additionalRecipeContent.child(textComponents));
 
         loadContentIntoSlots();
@@ -105,7 +118,7 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
         var row = Flow.row()
                 .horizontalCenter()
                 .coverChildrenHeight()
-                .widthRel(1.f)
+                .coverChildrenWidth()
                 .childPadding((recipeType.getUiLayout().getProgressBar().progressSize() / 3) + 2)
                 .child(inputColumn)
                 .child(uiLayout.getProgressWidgetSupplier()
@@ -123,6 +136,42 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
             layoutFunc.createCapabilityUILayout(uiLayout, this, IO.OUT);
         }
         return row;
+    }
+
+    /**
+     * Called, with the new width and height, when the panel's size changes after it was first laid out, for example
+     * because a condition or a modifier added rows. The recipe viewer integrations use it to re-measure.
+     */
+    @Override
+    public void setSizeListener(@Nullable BiConsumer<Integer, Integer> listener) {
+        this.sizeListener = listener;
+    }
+
+    @Override
+    public void onUpdate() {
+        super.onUpdate();
+        checkSize();
+    }
+
+    /**
+     * EMI and JEI draw a recipe's screen without ticking it, so the size is also checked as it is drawn. A text row
+     * only gets its height once it has been drawn, so the first size the layout gives can be short.
+     */
+    @Override
+    public void draw(ModularGuiContext context, WidgetThemeEntry<?> widgetTheme) {
+        super.draw(context, widgetTheme);
+        checkSize();
+    }
+
+    private void checkSize() {
+        if (sizeListener == null) return;
+        var area = getPanel().getArea();
+        // the panel reads as 0 by 0 while it is being laid out again; that is not a size to report
+        if (area.width <= 0 || area.height <= 0) return;
+        if (area.width == lastWidth && area.height == lastHeight) return;
+        lastWidth = area.width;
+        lastHeight = area.height;
+        sizeListener.accept(lastWidth, lastHeight);
     }
 
     public static String capabilityWidgetName(RecipeCapability<?> cap, IO io, int index) {
@@ -184,7 +233,7 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
         childIf(!FMLLoader.isProduction(), () -> new ButtonWidget<>()
                 .overlay(Text.str("ID"))
                 .decoration()
-                .bottom(3).right(3)
+                .bottom(12).right(3)
                 .size(15, 15)
                 .tooltip(r -> r.addLine("Click to copy recipe ID: " + baseRecipe.id))
                 .onMousePressed((ctx, b) -> {
@@ -194,10 +243,11 @@ public class GTRecipeViewerWidget extends ParentWidget<GTRecipeViewerWidget> {
     }
 
     private void attachOverclockButton() {
-        textComponents.child(new ButtonWidget<>().background(IDrawable.NONE)
+        // under the recipe ID button, at the edge of the page
+        child(new ButtonWidget<>().background(IDrawable.NONE)
                 .hoverBackground(IDrawable.NONE)
                 .size(22, 12)
-                .rightRel(0.0f)
+                .right(1).bottom(0)
                 .overlay(Text.dynamic(() -> Component.literal(GTValues.VNF[tier])))
                 .tooltipBuilder(tooltip -> {
                     tooltip.addLine(Text.lang("gtceu.oc.tooltip.0", GTValues.VNF[minTier]));

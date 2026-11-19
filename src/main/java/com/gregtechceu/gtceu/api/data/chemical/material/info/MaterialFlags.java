@@ -19,6 +19,11 @@ public class MaterialFlags {
         return this;
     }
 
+    public MaterialFlags removeFlags(MaterialFlag... flags) {
+        for (MaterialFlag flag : flags) this.flags.remove(flag);
+        return this;
+    }
+
     public void verify(Material material) {
         flags.addAll(flags.stream()
                 .map(f -> f.verifyFlag(material))

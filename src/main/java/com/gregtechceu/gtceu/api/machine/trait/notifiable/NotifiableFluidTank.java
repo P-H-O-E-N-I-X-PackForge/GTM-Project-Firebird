@@ -8,6 +8,7 @@ import com.gregtechceu.gtceu.api.machine.multiblock.part.MultiblockPartMachine;
 import com.gregtechceu.gtceu.api.machine.trait.ICapabilityTrait;
 import com.gregtechceu.gtceu.api.machine.trait.recipe.RecipeLogic;
 import com.gregtechceu.gtceu.api.recipe.GTRecipe;
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.recipe.ingredient.FluidIngredient;
 import com.gregtechceu.gtceu.api.recipe.ingredient.IntProviderFluidIngredient;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
@@ -20,9 +21,11 @@ import net.minecraft.core.Direction;
 import net.minecraftforge.fluids.FluidStack;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 
 public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngredient>
@@ -77,8 +80,11 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
 
     public void onContentsChanged() {
         isEmpty = null;
-        syncDataHolder.markClientSyncFieldDirty("storages");
         notifyListeners();
+    }
+
+    private void backupTank(FluidStack[] backup, int tank) {
+        if (backup != null && backup[tank] == null) backup[tank] = storages[tank].getFluid().copy();
     }
 
     @Override
@@ -100,6 +106,15 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
         // Necessary for simulation since we don't actually modify the slot's contents
         // Doesn't hurt for execution, and definitely cheaper than copying the entire storage
         FluidStack[] visited = new FluidStack[storages.length];
+        // what the tanks held before, for taking the changes back if the recipe does not go through
+        FluidStack[] backup = simulate || !RecipeTransaction.isActive() ? null : new FluidStack[storages.length];
+        if (backup != null) {
+            RecipeTransaction.record(() -> {
+                for (int i = 0; i < backup.length; i++) {
+                    if (backup[i] != null) storages[i].setFluid(backup[i]);
+                }
+            });
+        }
         for (var it = left.iterator(); it.hasNext();) {
             var ingredient = it.next();
             if (ingredient.isEmpty()) {
@@ -134,6 +149,7 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
                 if (existing != null) {
                     FluidStack output = fluids[0].copy();
                     output.setAmount(amount);
+                    backupTank(backup, tank);
                     int filled = existing.fill(output, action);
                     if (filled > 0) {
                         visited[tank] = output.copy();
@@ -157,6 +173,7 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
                 if (io == IO.IN) {
                     if (current.isEmpty()) continue;
                     if (ingredient.test(current)) {
+                        backupTank(backup, tank);
                         var drained = storages[tank].drain(Math.min(count, amount), action);
                         if (!drained.isEmpty()) {
                             visited[tank] = drained.copy();
@@ -188,6 +205,7 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
                     output.setAmount(amount);
                     if (visited[tank] == null || visited[tank].isFluidEqual(output)) {
                         if (count < storages[tank].getCapacity()) {
+                            backupTank(backup, tank);
                             int filled = storages[tank].fill(output, action);
                             if (filled > 0) {
                                 visited[tank] = output.copy();
@@ -325,8 +343,17 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
         return storages[tank].isFluidValid(stack);
     }
 
+    /** Whether the machine has the IO of this disabled, as a locked hatch does: it is not used by recipes. */
+    @Setter
+    protected BooleanSupplier isIODisabled = () -> false;
+
+    public boolean isIODisabled() {
+        return isIODisabled.getAsBoolean();
+    }
+
     @Override
     public int fill(FluidStack resource, FluidAction action) {
+        if (isIODisabled.getAsBoolean()) return 0;
         if (!canCapInput()) return 0;
         return fillInternal(resource, action);
     }
@@ -362,6 +389,7 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
 
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action) {
+        if (isIODisabled.getAsBoolean()) return FluidStack.EMPTY;
         if (canCapOutput()) {
             return drainInternal(resource, action);
         }
@@ -383,6 +411,7 @@ public class NotifiableFluidTank extends NotifiableRecipeHandlerTrait<FluidIngre
 
     @Override
     public FluidStack drain(int maxDrain, FluidAction action) {
+        if (isIODisabled.getAsBoolean()) return FluidStack.EMPTY;
         if (canCapOutput()) {
             return drainInternal(maxDrain, action);
         }

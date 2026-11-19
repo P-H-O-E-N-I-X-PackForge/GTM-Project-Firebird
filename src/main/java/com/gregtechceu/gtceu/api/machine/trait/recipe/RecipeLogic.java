@@ -24,6 +24,7 @@ import com.gregtechceu.gtceu.api.sync_system.annotations.SaveField;
 import com.gregtechceu.gtceu.api.sync_system.annotations.SyncToClient;
 import com.gregtechceu.gtceu.api.sync_system.data_transformers.gtceu.ChanceCacheTransformer;
 import com.gregtechceu.gtceu.common.cover.MachineControllerCover;
+import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.GTMath;
 
 import net.minecraft.network.chat.Component;
@@ -340,20 +341,7 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
                     runAttempt++;
                     runAttempt = (int) GTMath.clamp(runAttempt, 0, 5);
                     if (runAttempt == 5) {
-                        boolean preventPowerFail = false;
-                        if (getMachine() instanceof MultiblockControllerMachine) {
-                            var covers = getMachine().getCoverContainer().getCovers();
-                            for (var cover : covers) {
-                                if (cover instanceof MachineControllerCover mcc) {
-                                    if (mcc.preventPowerFail()) {
-                                        preventPowerFail = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (getMachine() instanceof MultiblockControllerMachine && !preventPowerFail) {
+                        if (getMachine() instanceof MultiblockControllerMachine && powerFailApplies()) {
                             runAttempt = 0;
                             // The reason recorded by setWaiting above carries over into SUSPEND.
                             setStatus(Status.SUSPEND);
@@ -368,6 +356,23 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
         if (isWaiting() || isSuspend()) {
             regressRecipe();
         }
+    }
+
+    /**
+     * Whether this multiblock stops its recipe after failing to get power. By default it does not, unless a Machine
+     * Controller cover has Power Failing turned on. With the multiblockPowerFail config, all do, unless a cover
+     * prevents it.
+     */
+    private boolean powerFailApplies() {
+        boolean prevent = false;
+        boolean enable = false;
+        for (var cover : getMachine().getCoverContainer().getCovers()) {
+            if (cover instanceof MachineControllerCover mcc) {
+                prevent |= mcc.preventPowerFail();
+                enable |= mcc.enablePowerFail();
+            }
+        }
+        return ConfigHolder.getInstance().gameplay.multiblockPowerFail ? !prevent : enable;
     }
 
     protected void regressRecipe() {
@@ -480,11 +485,25 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
             duration = runningRecipe.duration;
             isActive = true;
             syncDataHolder.resyncAllFields();
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    new com.gregtechceu.gtceu.api.events.MachineRecipeStartedEvent(getRLMachine(), runningRecipe));
         } else {
             lastRecipe = null;
             lastUnrolledRecipe = null;
             syncDataHolder.markClientSyncFieldDirty("lastUnrolledRecipe");
         }
+    }
+
+    /**
+     * For the multiblock preview, which shows a machine as working without a recipe running: the status is set
+     * directly, as {@link #setStatus} does nothing on the client, and halfway through a recipe, for the renders that
+     * show the progress.
+     */
+    public void showWorkingForPreview() {
+        this.status = Status.WORKING;
+        this.isActive = true;
+        this.duration = 200;
+        this.progress = 100;
     }
 
     public void setStatus(Status status) {
@@ -498,7 +517,10 @@ public class RecipeLogic extends MachineTrait implements IWorkable {
                 suspendAfterFinish = false;
             }
             getRLMachine().recipeLogicStatusChanged(this.status, status);
+            Status previous = this.status;
             this.status = status;
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    new com.gregtechceu.gtceu.api.events.MachineRecipeStatusEvent(getRLMachine(), previous, status));
             syncDataHolder.markClientSyncFieldDirty("status");
             setRenderState(getRenderState().setValue(GTMachineModelProperties.RECIPE_LOGIC_STATUS, status));
             updateTickSubscription();

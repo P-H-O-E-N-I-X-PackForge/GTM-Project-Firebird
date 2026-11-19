@@ -26,6 +26,17 @@ public final class FieldSyncData {
     public @Nullable ValueTransformer<?> transformer;
     public final List<MethodHandle> changeListenerHandles;
     public final TypeDeclaration type;
+    /** Whether a change of this field's value can be seen by comparing it: it is a simple immutable value. */
+    public final boolean autoDetectable;
+
+    private static boolean isSimpleValue(Class<?> type) {
+        return type.isPrimitive() || type.isEnum() || Number.class.isAssignableFrom(type) ||
+                type == Boolean.class || type == Character.class || type == String.class ||
+                type == java.util.UUID.class || type == net.minecraft.resources.ResourceLocation.class ||
+                type == net.minecraft.core.BlockPos.class ||
+                type == net.minecraft.world.level.block.state.BlockState.class ||
+                net.minecraft.network.chat.Component.class.isAssignableFrom(type);
+    }
 
     public FieldSyncData(Field field, VarHandle handle, @Nullable ValueTransformer<?> transformer,
                          List<MethodHandle> changeListenerHandles) {
@@ -37,5 +48,6 @@ public final class FieldSyncData {
         this.changeListenerHandles = changeListenerHandles;
         this.transformer = transformer;
         this.type = new TypeDeclaration(field.getGenericType());
+        this.autoDetectable = isSimpleValue(field.getType());
     }
 }

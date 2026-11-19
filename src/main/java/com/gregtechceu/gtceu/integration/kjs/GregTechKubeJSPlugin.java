@@ -197,7 +197,14 @@ public class GregTechKubeJSPlugin extends KubeJSPlugin {
         super.registerEvents();
         GTCEuStartupEvents.GROUP.register();
         GTCEuServerEvents.GROUP.register();
+        // pass GT's game bus events on to scripts, once
+        if (!gameEventsBridged) {
+            gameEventsBridged = true;
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(GTKubeEventBridge.class);
+        }
     }
+
+    private static boolean gameEventsBridged = false;
 
     @Override
     public void generateDataJsons(DataJsonGenerator generator) {

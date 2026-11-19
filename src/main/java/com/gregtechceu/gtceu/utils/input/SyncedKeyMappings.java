@@ -17,6 +17,8 @@ public final class SyncedKeyMappings {
             .createFromMC(() -> () -> Minecraft.getInstance().options.keyJump);
     public static final SyncedKeyMapping VANILLA_SNEAK = SyncedKeyMapping
             .createFromMC(() -> () -> Minecraft.getInstance().options.keyShift);
+    public static final SyncedKeyMapping VANILLA_SPRINT = SyncedKeyMapping
+            .createFromMC(() -> () -> Minecraft.getInstance().options.keySprint);
     public static final SyncedKeyMapping VANILLA_FORWARD = SyncedKeyMapping
             .createFromMC(() -> () -> Minecraft.getInstance().options.keyUp);
     public static final SyncedKeyMapping VANILLA_BACKWARD = SyncedKeyMapping

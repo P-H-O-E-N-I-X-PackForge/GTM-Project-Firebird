@@ -1,5 +1,7 @@
 package com.gregtechceu.gtceu.common.machine.multiblock.part;
 
+import com.gregtechceu.gtceu.api.transfer.fluid.GuardedFluidTank;
+import com.gregtechceu.gtceu.api.capability.ILockableHatch;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.blockentity.IPaintable;
 import com.gregtechceu.gtceu.api.capability.recipe.IO;
@@ -56,7 +58,8 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMachine, IPaintable {
+public class FluidHatchPartMachine extends TieredIOPartMachine
+                                   implements IMuiMachine, IPaintable, ILockableHatch {
 
     public static final int INITIAL_TANK_CAPACITY_1X = 8 * FluidType.BUCKET_VOLUME;
     public static final int INITIAL_TANK_CAPACITY_4X = 2 * FluidType.BUCKET_VOLUME;
@@ -73,6 +76,11 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
     @SaveField
     @SyncToClient
     protected boolean circuitSlotEnabled;
+    /** Locked by the multiblock: nothing goes in or out by hand, by auto IO or from the sides. */
+    @Getter
+    @SaveField
+    @SyncToClient
+    protected boolean locked;
 
     @SaveField
     protected final ProgrammableCircuitSlotTrait circuitSlot;
@@ -81,6 +89,7 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
         super(info, tier, io);
         this.slots = slots;
         this.tank = attachTrait(createTank(initialCapacity, slots));
+        this.tank.setIsIODisabled(this::isLocked);
 
         this.circuitSlot = attachTrait(new ProgrammableCircuitSlotTrait());
         circuitSlot.setEnabled(io == IO.IN);
@@ -90,6 +99,7 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
         super(info, tier, io);
         this.slots = fluidTank.getTanks();
         this.tank = attachTrait(fluidTank);
+        this.tank.setIsIODisabled(this::isLocked);
 
         this.circuitSlot = attachTrait(new ProgrammableCircuitSlotTrait());
         circuitSlot.setEnabled(io == IO.IN);
@@ -169,8 +179,18 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
         updateTankSubscription(getFrontFacing());
     }
 
+    protected boolean canAutoIO() {
+        return isWorkingEnabled() && !isLocked();
+    }
+
+    @Override
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+        updateTankSubscription();
+    }
+
     protected void updateTankSubscription(Direction newFacing) {
-        if (isWorkingEnabled() && ((io.support(IO.OUT) && !tank.isEmpty()) || io.support(IO.IN)) &&
+        if (canAutoIO() && ((io.support(IO.OUT) && !tank.isEmpty()) || io.support(IO.IN)) &&
                 GTTransferUtils.hasAdjacentFluidHandler(getLevel(), getBlockPos(), newFacing)) {
             autoIOSubs = subscribeServerTick(autoIOSubs, this::autoIO);
         } else if (autoIOSubs != null) {
@@ -181,7 +201,7 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
 
     protected void autoIO() {
         if (getOffsetTimer() % 5 == 0) {
-            if (isWorkingEnabled()) {
+            if (canAutoIO()) {
                 if (io == IO.OUT) {
                     tank.exportToNearby(getFrontFacing());
                 } else if (io == IO.IN) {
@@ -310,7 +330,8 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
                         .childIf(lockButtonSupplier != null, lockButtonSupplier)
                         .child(new FluidSlot()
                                 .name("regularFluid")
-                                .syncHandler(new FluidSlotSyncHandler(tank.getStorages()[0])
+                                .syncHandler(new FluidSlotSyncHandler(
+                                        new GuardedFluidTank(tank.getStorages()[0], this::isLocked))
                                         .canFillSlot(io.support(IO.IN)))));
     }
 
@@ -324,7 +345,7 @@ public class FluidHatchPartMachine extends TieredIOPartMachine implements IMuiMa
         if (tank instanceof FilteredFluidTank filteredFluidTank) {
             filterWidgetSupplier = () -> GTMuiWidgets.createFilterRow(
                     Flow.row().width(9 * 18).coverChildrenHeight().childPadding(2),
-                    filteredFluidTank.getFilterHandler(), guiData, syncManager, settings);
+                    filteredFluidTank.getFilterHandler(), guiData, syncManager, settings, null);
         }
 
         return Flow.col()

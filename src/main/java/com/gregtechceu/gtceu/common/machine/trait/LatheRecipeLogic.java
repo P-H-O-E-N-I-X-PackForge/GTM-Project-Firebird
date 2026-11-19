@@ -51,7 +51,7 @@ public class LatheRecipeLogic extends RecipeLogic {
     };
 
     private static boolean isLubricatedRod(GTRecipe recipe) {
-        return recipe != null && recipe.data.contains(LUBRICATED_ROD);
+        return recipe.data.contains(LUBRICATED_ROD);
     }
 
     @Override
@@ -86,7 +86,7 @@ public class LatheRecipeLogic extends RecipeLogic {
     @Override
     public void findAndHandleRecipe() {
         // Recheck lubricant before reusing a cached rod recipe.
-        if (isLubricatedRod(lastUnrolledRecipe)) markLastRecipeDirty();
+        if (lastUnrolledRecipe != null && isLubricatedRod(lastUnrolledRecipe)) markLastRecipeDirty();
         super.findAndHandleRecipe();
     }
 

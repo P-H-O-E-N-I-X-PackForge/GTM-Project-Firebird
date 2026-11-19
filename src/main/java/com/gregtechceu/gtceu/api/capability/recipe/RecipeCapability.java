@@ -104,6 +104,17 @@ public abstract class RecipeCapability<T> {
     }
 
     /**
+     * What the recipe viewers should show and index for one piece of content of this capability. The default is
+     * nothing, which is what a capability that draws itself in the recipe UI wants. Item and fluid capabilities return
+     * their stacks; a capability with its own stack type returns an
+     * {@link brachy.modularui.integration.recipeviewer.entry.EntryList} of it, and registers a converter for that type
+     * with EMI ({@code EmiStackConverter.register}) and JEI ({@code GTJeiIngredients.register}).
+     */
+    public List<com.gregtechceu.gtceu.api.recipe.gui.ViewerEntry> toViewerEntries(Content content) {
+        return List.of();
+    }
+
+    /**
      * used for recipe builder via KubeJs.
      */
     public T of(Object o) {

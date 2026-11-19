@@ -5,6 +5,7 @@ import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
 import com.gregtechceu.gtceu.api.recipe.category.GTRecipeCategory;
+import com.gregtechceu.gtceu.api.recipe.gui.viewer.GTViewerVisibility;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
 import com.gregtechceu.gtceu.common.data.GTRecipeTypes;
 
@@ -47,6 +48,7 @@ public class GTRecipeEMICategory extends EmiRecipeCategory {
             }
             EmiRecipeCategory emiCategory = CATEGORIES.apply(category);
             type.getRecipesInCategory(category).stream()
+                    .filter(r -> GTViewerVisibility.isVisible(category.registryKey, r.id, r))
                     .map(recipe -> new GTEmiRecipe(recipe, emiCategory))
                     .forEach(registry::addRecipe);
         }
@@ -56,6 +58,7 @@ public class GTRecipeEMICategory extends EmiRecipeCategory {
             var type = subCategory.getRecipeType();
             EmiRecipeCategory emiCategory = CATEGORIES.apply(subCategory);
             type.getRecipesInCategory(subCategory).stream()
+                    .filter(r -> GTViewerVisibility.isVisible(subCategory.registryKey, r.id, r))
                     .map(recipe -> new GTEmiRecipe(recipe, emiCategory))
                     .forEach(registry::addRecipe);
         }

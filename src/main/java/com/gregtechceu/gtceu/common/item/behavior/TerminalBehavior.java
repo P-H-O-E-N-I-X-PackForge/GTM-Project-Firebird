@@ -18,6 +18,7 @@ import com.gregtechceu.gtceu.api.multiblock.util.BlockInfo;
 import com.gregtechceu.gtceu.common.network.GTNetwork;
 import com.gregtechceu.gtceu.common.network.packets.CPacketTerminalSettings;
 import com.gregtechceu.gtceu.integration.recipeviewer.widgets.MultiblockPreviewWidget;
+import com.gregtechceu.gtceu.utils.GTUtil;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -52,9 +53,11 @@ import it.unimi.dsi.fastutil.ints.*;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 import static com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine.DEFAULT_STRUCTURE;
 
@@ -81,16 +84,25 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
             return InteractionResult.PASS;
         }
 
-        var info = loadControllerInfo(stack);
-        if (info == null) return InteractionResult.PASS;
+        // Sneak-clicking a controller builds it. If the terminal already holds this multiblock's information, from a
+        // right click on the controller, its block choices and flip are used. Otherwise the multiblock is built as it
+        // is, with the default blocks, and the terminal is left as it was.
+        var stored = loadControllerInfo(stack);
+        boolean useStored = stored != null && controller.getDefinition() == stored.definition();
+        var info = useStored ? stored : new ControllerInfo(controller);
 
-        if (controller.getDefinition() != info.definition()) {
-            // TODO: Log errors in chat
+        MultiblockSchemaInfo chosen = useStored ? loadSchemaInfo(stack, info) : defaultSchemaInfo(info);
+        String structure = chosen.getStructure();
+        PatternState state = controller.getPatternState(structure);
+        if (state == null) {
             return InteractionResult.PASS;
         }
-
-        PatternState state = controller.getDefaultPatternState();
-        if (state.isFormed()) {
+        // nothing to build when the structure and everything layered on it are formed
+        boolean everythingFormed = state.isFormed();
+        for (String overlay : chosen.getOverlays()) {
+            everythingFormed &= controller.isStructureFormed(overlay);
+        }
+        if (everythingFormed) {
             return InteractionResult.PASS;
         }
 
@@ -98,7 +110,7 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
         Direction upFacing = controller.getUpwardsFacing();
 
         if (!level.isClientSide) {
-            MultiblockSchemaInfo schemaInfo = loadSchemaInfo(stack, info);
+            MultiblockSchemaInfo schemaInfo = chosen;
             boolean flipped = schemaInfo.isFlipped();
 
             ServerPlayer serverPlayer = (ServerPlayer) player;
@@ -106,7 +118,7 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
             // TODO: Probably extract into helper function
             Map<BlockPos, BlockInfo> resultStructure = new HashMap<>();
             AbstractStructureHelper structureHelper = null;
-            IBlockPattern pattern = controller.getStructurePatterns().get(DEFAULT_STRUCTURE);
+            IBlockPattern pattern = schemaInfo.getPattern();
             if (pattern instanceof BlockPattern blockPattern) {
                 Int2IntMap slices = new Int2IntArrayMap();
                 for (int i = 0; i < blockPattern.getSlices().length; i++) {
@@ -134,6 +146,8 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                         schemaInfo.getUserGlobalBlockPreferences(), frontFacing,
                         upFacing,
                         flipped);
+                // the structures layered on the selected one are built with it
+                schemaInfo.addOverlays(resultStructure, frontFacing, upFacing, flipped);
             }
 
             // Extract controller block offset
@@ -157,8 +171,23 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
             }
 
             // needed to force the multiblock to do a clean check, kinda sus
-            controller.getDefaultPatternState().getCache().clear();
-            controller.checkAndFormStructure();
+            if (structure.equals(DEFAULT_STRUCTURE)) {
+                controller.getDefaultPatternState().getCache().clear();
+                controller.checkAndFormStructure();
+            } else {
+                state.getCache().clear();
+                if (controller.checkStructurePattern(structure).getState().isValid()) {
+                    controller.formStructure(structure);
+                }
+            }
+            for (String overlay : schemaInfo.getOverlays()) {
+                var overlayState = controller.getPatternState(overlay);
+                if (overlayState == null) continue;
+                overlayState.getCache().clear();
+                if (controller.checkStructurePattern(overlay).getState().isValid()) {
+                    controller.formStructure(overlay);
+                }
+            }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
@@ -239,7 +268,8 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
         GTNetwork.sendToServer(new CPacketTerminalSettings(hand, definition, schemaInfo.getUserSliceRepeats(),
                 schemaInfo.getUserDimensions(), schemaInfo.getUserGlobalBlockPreferences(),
                 schemaInfo.getBlockPreferences(), previewWidget.isFlipped(), previewWidget.isClearMulti(),
-                previewWidget.isClearPreferences(), schemaInfo.isIgnorePreviewCount()));
+                previewWidget.isClearPreferences(), schemaInfo.isIgnorePreviewCount())
+                .structure(schemaInfo.getStructure(), schemaInfo.getOverlays()));
     }
 
     public static void applyUserPreferences(ItemStack item, MultiblockSchemaInfo schemaInfo,
@@ -307,6 +337,7 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                     info.pos().getX(), info.pos().getY(), info.pos().getZ())
                     .withStyle(ChatFormatting.GOLD));
             tooltipComponents.add(info.definition().getBlock().getName());
+            addSettingsTooltip(stack, info, tooltipComponents);
         }
 
         GlobalPos aeBinding = getLinkedPos(stack);
@@ -315,6 +346,57 @@ public class TerminalBehavior implements IInteractionItem, IItemUIHolder, IAddIn
                     aeBinding.pos().getX(), aeBinding.pos().getY(), aeBinding.pos().getZ())
                     .withStyle(ChatFormatting.GOLD));
         }
+    }
+
+    /** What the terminal will do: how it shows and builds the multiblock, as the player has set it in the preview. */
+    private void addSettingsTooltip(ItemStack stack, ControllerInfo info, List<Component> tooltip) {
+        MultiblockSchemaInfo schema = loadSchemaInfo(stack, info);
+        boolean flipped = schema.isFlipped();
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.flipped", stateName(flipped))
+                .withStyle(ChatFormatting.GRAY));
+
+        // the layers: how often each repeatable section is built, the minimum where it was not set
+        Component layers;
+        if (schema.getUserSliceRepeats().isEmpty()) {
+            layers = Component.translatable("gtceu.terminal.tooltip.layers.minimum");
+        } else {
+            StringJoiner joined = new StringJoiner(", ");
+            for (int count : schema.getUserSliceRepeats().values()) joined.add(String.valueOf(count));
+            layers = Component.literal(joined.toString());
+        }
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.layers", layers).withStyle(ChatFormatting.GRAY));
+
+        // the variant: the blocks the player picked in place of the multiblock's own
+        Component variant;
+        if (schema.getUserGlobalBlockPreferences().isEmpty()) {
+            variant = Component.translatable("gtceu.terminal.tooltip.variant.default");
+        } else {
+            Map<Block, Integer> picked = new LinkedHashMap<>();
+            for (var preference : schema.getUserGlobalBlockPreferences().values()) {
+                picked.merge(preference.getBlockState().getBlock(), 1, Integer::sum);
+            }
+            var joined = Component.empty();
+            boolean first = true;
+            for (var entry : picked.entrySet()) {
+                if (!first) joined.append(", ");
+                joined.append(entry.getKey().getName());
+                first = false;
+            }
+            variant = joined;
+        }
+        tooltip.add(Component.translatable("gtceu.terminal.tooltip.variant", variant).withStyle(ChatFormatting.GRAY));
+
+        if (GTUtil.isShiftDown()) {
+            tooltip.add(Component.translatable("gtceu.terminal.help.load").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("gtceu.terminal.help.preview").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("gtceu.terminal.help.build").withStyle(ChatFormatting.DARK_GRAY));
+        } else {
+            tooltip.add(Component.translatable("gtceu.terminal.tooltip.hold_shift").withStyle(ChatFormatting.DARK_GRAY));
+        }
+    }
+
+    private static Component stateName(boolean enabled) {
+        return Component.translatable(enabled ? "gtceu.terminal.tooltip.yes" : "gtceu.terminal.tooltip.no");
     }
 
     @Nullable

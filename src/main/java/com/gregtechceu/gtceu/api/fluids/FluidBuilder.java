@@ -2,6 +2,7 @@ package com.gregtechceu.gtceu.api.fluids;
 
 import com.gregtechceu.gtceu.api.data.chemical.material.Material;
 import com.gregtechceu.gtceu.api.data.chemical.material.info.MaterialFlags;
+import com.gregtechceu.gtceu.api.data.chemical.material.info.MaterialIconSet;
 import com.gregtechceu.gtceu.api.data.chemical.material.info.MaterialIconType;
 import com.gregtechceu.gtceu.api.data.chemical.material.properties.BlastProperty;
 import com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey;
@@ -28,12 +29,38 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import static com.gregtechceu.gtceu.api.fluids.FluidConstants.*;
 
 @Accessors(fluent = true, chain = true)
 public class FluidBuilder {
+
+    /**
+     * The still and flowing textures of a fluid icon set, and whether the fluid's colour tints them. Textures can be
+     * any in the block atlas, from this mod or another, even vanilla's.
+     */
+    public record IconSetTextures(ResourceLocation still, ResourceLocation flowing, boolean tinted) {}
+
+    private static final Map<ResourceLocation, IconSetTextures> ICONSET_TEXTURES = new HashMap<>();
+
+    /**
+     * Gives an icon set textures for the fluids that use it, the way a material icon set gives textures to a material's
+     * items. Fluids of a set that has none, and no parent that does, keep using the material icon set paths.
+     * <p>
+     * Resource packs can still replace the textures themselves.
+     */
+    public static void registerIconSetTextures(ResourceLocation iconSetId, ResourceLocation still,
+                                               ResourceLocation flowing, boolean tinted) {
+        ICONSET_TEXTURES.put(iconSetId, new IconSetTextures(still, flowing, tinted));
+    }
+
+    public static void registerIconSetTextures(MaterialIconSet iconSet, ResourceLocation still,
+                                               ResourceLocation flowing, boolean tinted) {
+        registerIconSetTextures(iconSet.id, still, flowing, tinted);
+    }
 
     private static final int INFER_TEMPERATURE = -1;
     private static final int INFER_COLOR = 0xFFFFFFFF;
@@ -53,6 +80,12 @@ public class FluidBuilder {
     private int temperature = INFER_TEMPERATURE;
     private int color = INFER_COLOR;
     private boolean isColorEnabled = true;
+    /** Whether a colour was asked for: an icon set that comes with its own colouring leaves such a fluid tinted. */
+    private boolean colorChosen = false;
+    @Nullable
+    private MaterialIconSet iconSet = null;
+    @Nullable
+    private IconSetTextures explicitTextures = null;
     @Setter
     private int density = INFER_DENSITY;
     private int luminosity = INFER_LUMINOSITY;
@@ -93,10 +126,47 @@ public class FluidBuilder {
      * @return this
      */
     public @NotNull FluidBuilder color(int color) {
+        this.colorChosen = true;
         this.color = GTUtil.convertRGBtoARGB(color);
         if (this.color == INFER_COLOR) {
             return disableColor();
         }
+        return this;
+    }
+
+    /**
+     * Picks the textures for this fluid from an icon set of its own, instead of the one its material uses for its
+     * items. An icon set with registered fluid textures (see {@link #registerIconSetTextures}), such as
+     * {@link MaterialIconSet#LAVA} and {@link MaterialIconSet#WATER}, gives the fluid those; any other uses the usual
+     * material icon set paths. A colour set with {@link #color(int)} still tints the fluid, and so does
+     * {@link #customStill()} replace the icon set's texture.
+     */
+    public @NotNull FluidBuilder iconSet(MaterialIconSet iconSet) {
+        this.iconSet = iconSet;
+        return this;
+    }
+
+    /**
+     * Same, looking the icon set up by its id, for scripts and for sets that are registered by name.
+     *
+     * @throws IllegalArgumentException if there is no such icon set
+     */
+    public @NotNull FluidBuilder iconSetId(ResourceLocation iconSetId) {
+        MaterialIconSet set = com.gregtechceu.gtceu.api.registry.GTRegistries.MATERIAL_ICON_SETS.get(iconSetId);
+        if (set == null) throw new IllegalArgumentException("No material icon set " + iconSetId);
+        return iconSet(set);
+    }
+
+    /**
+     * Gives this one fluid textures of its own, from any mod. Unlike {@link #customStill()}, which looks for files
+     * named after the fluid in its material's mod, these can be anywhere, so an addon can retexture a fluid it did not
+     * make. They take priority over {@link #iconSet}.
+     *
+     * @param flowing the flowing texture, or null to use the still one
+     * @param tinted  whether the fluid's colour tints them
+     */
+    public @NotNull FluidBuilder textures(ResourceLocation still, @Nullable ResourceLocation flowing, boolean tinted) {
+        this.explicitTextures = new IconSetTextures(still, flowing == null ? still : flowing, tinted);
         return this;
     }
 
@@ -297,7 +367,12 @@ public class FluidBuilder {
     }
 
     private void determineTextures(@NotNull Material material, @Nullable FluidStorageKey key, @NotNull String modid) {
-        if (key != null) {
+        IconSetTextures setTextures = explicitTextures != null ? explicitTextures :
+                key != null && state == FluidState.LIQUID && !hasCustomStill ? findIconSetTextures(material) : null;
+        if (setTextures != null) {
+            still = setTextures.still();
+            if (!setTextures.tinted() && !colorChosen) isColorEnabled = false;
+        } else if (key != null) {
             if (hasCustomStill) {
                 still = ResourceLocation.fromNamespaceAndPath(modid, "block/fluids/fluid." + name);
             } else {
@@ -311,9 +386,22 @@ public class FluidBuilder {
 
         if (hasCustomFlowing) {
             flowing = ResourceLocation.fromNamespaceAndPath(modid, "block/fluids/fluid." + name + "_flow");
+        } else if (setTextures != null) {
+            flowing = setTextures.flowing();
         } else {
             flowing = still;
         }
+    }
+
+    /** The textures of the nearest icon set, this fluid's own or its material's, going up through the parents. */
+    private @Nullable IconSetTextures findIconSetTextures(Material material) {
+        MaterialIconSet set = iconSet != null ? iconSet : material.getMaterialIconSet();
+        while (set != null) {
+            IconSetTextures textures = ICONSET_TEXTURES.get(set.id);
+            if (textures != null) return textures;
+            set = set.parentIconset;
+        }
+        return null;
     }
 
     private void determineTemperature(@NotNull Material material) {

@@ -1,5 +1,6 @@
 package com.gregtechceu.gtceu.integration.ae2.machine;
 
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.capability.recipe.IO;
 import com.gregtechceu.gtceu.api.machine.trait.notifiable.NotifiableItemStackHandler;
@@ -226,6 +227,13 @@ public class MEOutputBusPartMachine extends MEBusPartMachine {
                 if (!simulate) {
                     keyStorage.storage.put(key, oldValue + changeValue);
                     keyStorage.onChanged();
+                    // taken back if the recipe this is the output of does not go through
+                    RecipeTransaction.record(() -> {
+                        long current = keyStorage.storage.getOrDefault(key, 0L) - changeValue;
+                        if (current > 0) keyStorage.storage.put(key, current);
+                        else keyStorage.storage.removeLong(key);
+                        keyStorage.onChanged();
+                    });
                 }
                 return stack.copyWithCount((int) (count - changeValue));
             } else {

@@ -28,7 +28,11 @@ public class GTRecipeUIModifiers {
             widget.textComponents.child(new TextWidget<>(
                     Text.lang("gtceu.recipe.temperature", FormattingUtil.formatTemperature(temp))));
 
-            Flow coilRow = Flow.row().coverChildrenHeight();
+            // the coil's name and, after it in the same row, a small icon of the coils that reach the temperature. The
+            // icon used to be placed with an offset from the row's edge, which put it over the text and the line
+            // under it whenever the text was wide.
+            Flow coilRow = Flow.row().coverChildren().childPadding(2)
+                    .crossAxisAlignment(brachy.modularui.utils.Alignment.CrossAxis.CENTER);
 
             ICoilType requiredCoil = ICoilType.getMinRequiredType(temp);
 
@@ -46,7 +50,7 @@ public class GTRecipeUIModifiers {
                     .recipeSlotRole(RecipeSlotRole.RENDER_ONLY)
                     .value(ItemStackList.of(items))
                     .background(IDrawable.EMPTY)
-                    .right(20));
+                    .size(14, 14));
 
             widget.textComponents.child(coilRow);
         }

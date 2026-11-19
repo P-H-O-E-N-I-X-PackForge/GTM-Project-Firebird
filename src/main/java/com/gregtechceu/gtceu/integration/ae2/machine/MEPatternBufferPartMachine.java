@@ -1,5 +1,6 @@
 package com.gregtechceu.gtceu.integration.ae2.machine;
 
+import com.gregtechceu.gtceu.api.recipe.RecipeTransaction;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.capability.recipe.FluidRecipeCapability;
 import com.gregtechceu.gtceu.api.capability.recipe.IFilteredHandler;
@@ -1069,6 +1070,12 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                         count -= extracted;
                         if (count == 0) it2.remove();
                         else entry.setValue(count);
+                        // given back if the recipe this is the input of does not go through
+                        final int taken = extracted;
+                        RecipeTransaction.record(() -> {
+                            itemInventory.addTo(stack, taken);
+                            onContentsChanged();
+                        });
                     }
                     amount -= extracted;
 
@@ -1121,6 +1128,12 @@ public class MEPatternBufferPartMachine extends MEBusPartMachine
                         count -= extracted;
                         if (count == 0) it2.remove();
                         else entry.setValue(count);
+                        // given back if the recipe this is the input of does not go through
+                        final int taken = extracted;
+                        RecipeTransaction.record(() -> {
+                            fluidInventory.addTo(stack, taken);
+                            onContentsChanged();
+                        });
                     }
                     amount -= extracted;
 

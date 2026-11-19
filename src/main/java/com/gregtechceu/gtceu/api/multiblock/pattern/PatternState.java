@@ -7,6 +7,7 @@ import com.gregtechceu.gtceu.api.multiblock.error.PatternError;
 import com.gregtechceu.gtceu.api.multiblock.util.BlockInfo;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -40,6 +41,7 @@ public class PatternState {
     protected boolean actualFlipped = false;
     @Setter
     protected boolean shouldUpdate = true;
+    private boolean recheckQueued = false;
     @Getter
     protected List<PatternError> errors = List.of();
     @Setter
@@ -115,19 +117,31 @@ public class PatternState {
                 return;
             }
 
-            for (var name : controller.getStructureNames()) {
-                PatternState patternState = controller.checkStructurePattern(name);
-                if (!patternState.hasErrors()) {
-                    controller.formStructure(name);
-                    // previous formation may not have added the full multiblock the saved data
-                    // todo there's probably a better way to do this
-                    MultiblockWorldSavedData.getOrCreate(serverLevel).addMapping(this);
-                } else {
-                    controller.invalidateStructure(name);
-                    if (name.equals(MultiblockControllerMachine.DEFAULT_STRUCTURE)) {
-                        MultiblockWorldSavedData.getOrCreate(serverLevel).removeMapping(this);
-                        controller.checkAndFormStructure();
-                    }
+            // Many blocks changing in one tick (a structure being built, an explosion, a world edit) used to run the
+            // full check once per block. They are folded into one check, run next tick.
+            if (recheckQueued) return;
+            recheckQueued = true;
+            serverLevel.getServer().tell(new TickTask(serverLevel.getServer().getTickCount() + 1, () -> {
+                recheckQueued = false;
+                recheckAfterChange(serverLevel);
+            }));
+        }
+    }
+
+    private void recheckAfterChange(ServerLevel serverLevel) {
+        if (controller == null || controller.isRemoved()) return;
+        for (var name : controller.getStructureNames()) {
+            PatternState patternState = controller.checkStructurePattern(name);
+            if (!patternState.hasErrors()) {
+                controller.formStructure(name);
+                // previous formation may not have added the full multiblock the saved data
+                // todo there's probably a better way to do this
+                MultiblockWorldSavedData.getOrCreate(serverLevel).addMapping(this);
+            } else {
+                controller.invalidateStructure(name);
+                if (name.equals(MultiblockControllerMachine.DEFAULT_STRUCTURE)) {
+                    MultiblockWorldSavedData.getOrCreate(serverLevel).removeMapping(this);
+                    controller.checkAndFormStructure();
                 }
             }
         }

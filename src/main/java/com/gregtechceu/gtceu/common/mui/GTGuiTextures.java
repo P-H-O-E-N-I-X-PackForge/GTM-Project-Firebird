@@ -68,6 +68,12 @@ public interface GTGuiTextures {
             .defaultColorType()
             .build();
 
+    UITexture TITLE_BAR_BACKGROUND = UITexture.builder()
+            .location(GTCEu.MOD_ID, "textures/gui/base/title_bar_background.png")
+            .imageSize(16, 16)
+            .adaptable(4)
+            .build();
+
     UITexture BACKGROUND_POPUP = UITexture.builder()
             .location(GTCEu.MOD_ID, "textures/gui/base/background_popup.png")
             .imageSize(195, 136)
@@ -637,6 +643,11 @@ public interface GTGuiTextures {
             "textures/gui/progress_bar/progress_bar_coke_oven.png", 36, 36, ColorType.DEFAULT);
     UITexture PROGRESS_BAR_DISTILLATION_TOWER = progressBar(
             "textures/gui/progress_bar/progress_bar_distillation_tower.png", 66, 116, ColorType.DEFAULT);
+    UITexture PROGRESS_BAR_DISTILLATION_BUBBLES = progressBar(
+            "textures/gui/progress_bar/progress_bar_distillation_tower_bubbles.png", 11, 102, ColorType.DEFAULT);
+    UITexture PROGRESS_BAR_DISTILLATION_COIL = progressBar(
+            "textures/gui/progress_bar/progress_bar_distillation_tower_coil.png", 12, 40, ColorType.DEFAULT);
+
     UITexture PROGRESS_BAR_SOLAR_BRONZE = progressBar(
             "textures/gui/progress_bar/progress_bar_solar_bronze.png", 10, 20);
     UITexture PROGRESS_BAR_SOLAR_STEEL = progressBar(

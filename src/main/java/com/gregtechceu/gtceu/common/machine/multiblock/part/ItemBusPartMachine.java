@@ -1,5 +1,7 @@
 package com.gregtechceu.gtceu.common.machine.multiblock.part;
 
+import com.gregtechceu.gtceu.api.transfer.item.GuardedItemHandler;
+import com.gregtechceu.gtceu.api.capability.ILockableHatch;
 import com.gregtechceu.gtceu.api.blockentity.BlockEntityCreationInfo;
 import com.gregtechceu.gtceu.api.blockentity.IPaintable;
 import com.gregtechceu.gtceu.api.capability.recipe.IO;
@@ -40,7 +42,7 @@ import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
 
 public class ItemBusPartMachine extends TieredIOPartMachine
-                                implements IDistinctPart, IMuiMachine, IPaintable {
+                                implements IDistinctPart, IMuiMachine, IPaintable, ILockableHatch {
 
     @Getter
     @SaveField
@@ -53,6 +55,11 @@ public class ItemBusPartMachine extends TieredIOPartMachine
     @SaveField
     @SyncToClient
     private boolean isDistinct = false;
+    /** Locked by the multiblock: nothing goes in or out by hand, by auto IO or from the sides. */
+    @Getter
+    @SaveField
+    @SyncToClient
+    protected boolean locked;
     @SaveField
     @SyncToClient
     @Getter
@@ -90,6 +97,7 @@ public class ItemBusPartMachine extends TieredIOPartMachine
         filterHandler = new FilterHandler<>(this, ItemStack.class);
 
         inventory.setFilter(this::matchesFilter);
+        inventory.setIsIODisabled(this::isLocked);
     }
 
     //////////////////////////////////////
@@ -175,8 +183,18 @@ public class ItemBusPartMachine extends TieredIOPartMachine
         updateInventorySubscription(getFrontFacing());
     }
 
+    protected boolean canAutoIO() {
+        return isWorkingEnabled() && !isLocked();
+    }
+
+    @Override
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+        updateInventorySubscription();
+    }
+
     protected void updateInventorySubscription(Direction newFacing) {
-        if (isWorkingEnabled() && ((io.support(IO.OUT) && !getInventory().isEmpty()) || io.support(IO.IN)) &&
+        if (canAutoIO() && ((io.support(IO.OUT) && !getInventory().isEmpty()) || io.support(IO.IN)) &&
                 GTTransferUtils.hasAdjacentItemHandler(getLevel(), getBlockPos(), newFacing)) {
             autoIOSubs = subscribeServerTick(autoIOSubs, this::autoIO);
         } else if (autoIOSubs != null) {
@@ -187,7 +205,7 @@ public class ItemBusPartMachine extends TieredIOPartMachine
 
     protected void autoIO() {
         if (getOffsetTimer() % 5 == 0) {
-            if (isWorkingEnabled()) {
+            if (canAutoIO()) {
                 if (io == IO.OUT) {
                     getInventory().exportToNearby(getFrontFacing());
                 } else if (io == IO.IN) {
@@ -260,7 +278,7 @@ public class ItemBusPartMachine extends TieredIOPartMachine
                 .coverChildren()
                 .margin(7, 5)
                 .gridOfSizeHeight(rowSize * rowSize, rowSize, (x, y, index) -> new ItemSlot()
-                        .slot(SyncHandlers.itemSlot(inventory.storage, index)
+                        .slot(SyncHandlers.itemSlot(new GuardedItemHandler(inventory.storage, this::isLocked), index)
                                 .slotGroup(group)
                                 .changeListener((oldStack, newStack, client, init) -> {
                                     if (ItemStack.isSameItem(oldStack, newStack)) {
@@ -270,13 +288,21 @@ public class ItemBusPartMachine extends TieredIOPartMachine
                                 .accessibility(inventory.handlerIO.support(IO.IN), true)));
 
         if (io == IO.OUT) {
+            if (getInventorySize(tier) == 1) {
+                mainWidget.child(grid.center());
+                Flow filterRow = Flow.row().width(9 * 18).coverChildrenHeight().childPadding(2);
+                GTMuiWidgets.createFilterRow(filterRow, filterHandler, guiData, syncManager, settings);
+                mainWidget.child(filterRow.bottomRel(0).horizontalCenter());
+                return;
+            }
             Flow filterRow = Flow.row().width(9 * 18).coverChildrenHeight().childPadding(2);
             mainWidget.child(Flow.col()
                     .coverChildren()
                     .center()
                     .crossAxisAlignment(Alignment.CrossAxis.CENTER)
                     .child(grid)
-                    .child(GTMuiWidgets.createFilterRow(filterRow, filterHandler, guiData, syncManager, settings)));
+                    .child(GTMuiWidgets.createFilterRow(filterRow, filterHandler, guiData, syncManager, settings,
+                            null)));
         } else {
             mainWidget.child(grid.center());
         }

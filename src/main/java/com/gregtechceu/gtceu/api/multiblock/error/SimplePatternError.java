@@ -11,7 +11,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import lombok.Getter;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class SimplePatternError extends PatternError {
@@ -33,20 +32,22 @@ public class SimplePatternError extends PatternError {
     @Override
     public PatternErrorUI getPatternErrorUIModifier() {
         return (parent) -> {
-            List<Component> lines = new ArrayList<>();
-
-            lines.add(Component.translatable("gtceu.multiblock.pattern.error.0"));
-            lines.add(Component.translatable("gtceu.multiblock.pattern.error.1", pos.getX(), pos.getY(),
-                    pos.getZ()));
+            parent.child(Text.lang("gtceu.multiblock.pattern.error.0").color(0xFFE0E0E0).asWidget());
+            parent.child(Text.of(Component.translatable("gtceu.multiblock.pattern.error.position", pos.getX(),
+                    pos.getY(), pos.getZ())).color(0xFFB0B0B0).asWidget());
+            // each block that fits there, with its picture
             for (List<BlockInfo> candidate : candidates) {
-                if (!candidate.isEmpty()) {
-                    Component c = candidate.get(0).getItemStackForm().getHoverName();
-                    lines.add(c);
-                    // builder.append(c.toString());
-                    // builder.append(COMMA_SEPERATOR_LITERAL);
-                }
+                if (candidate.isEmpty()) continue;
+                var stack = candidate.get(0).getItemStackForm();
+                parent.child(brachy.modularui.widgets.layout.Flow.row()
+                        .widthRel(1f)
+                        .coverChildrenHeight()
+                        .childPadding(4)
+                        .crossAxisAlignment(brachy.modularui.utils.Alignment.CrossAxis.CENTER)
+                        .child(new brachy.modularui.drawable.ItemDrawable(stack).asIcon().size(16).asWidget()
+                                .size(16))
+                        .child(Text.of(stack.getHoverName()).color(0xFFFFFFFF).asWidget()));
             }
-            lines.forEach(comp -> parent.child(Text.of(comp).asWidget()));
         };
     }
 

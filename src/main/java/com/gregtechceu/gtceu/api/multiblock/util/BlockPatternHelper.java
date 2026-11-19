@@ -90,12 +90,13 @@ public class BlockPatternHelper extends AbstractStructureHelper {
         for (var blockPreference : userBlockPreferences.object2ObjectEntrySet()) {
             BlockPos pos = blockPreference.getKey();
             BlockInfo blockInfo = blockPreference.getValue();
-            if (pos.getX() >= dimensions.getX() ||
+            if (pos.getX() < 0 || pos.getY() < 0 || pos.getZ() < 0 || pos.getX() >= dimensions.getX() ||
                     pos.getY() >= dimensions.getY() ||
                     pos.getZ() >= dimensions.getZ()) {
                 GTCEu.LOGGER.error(
                         "BlockPos preference " + pos + "is outside of bounds for pattern of size " +
                                 dimensions.getX() + "," + dimensions.getY() + "," + dimensions.getZ());
+                continue;
             }
             int offset = pos.get(sliceAxis);
             char c = this.flattenedBlockPattern[pos.getX()][pos.getY()][pos.getZ()];
@@ -104,6 +105,7 @@ public class BlockPatternHelper extends AbstractStructureHelper {
             if (basePair == null) {
                 GTCEu.LOGGER.error("Invalid preference " + blockInfo.getBlockState().getBlock().getName() +
                         " for position " + pos);
+                continue;
             }
             resultStructure.put(pos, blockInfo);
             incrementPredicate(basePair.value(), basePair.key(), offset);

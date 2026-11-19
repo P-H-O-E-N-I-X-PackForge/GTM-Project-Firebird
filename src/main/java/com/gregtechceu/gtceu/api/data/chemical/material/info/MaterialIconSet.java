@@ -41,7 +41,21 @@ public class MaterialIconSet {
     public static final MaterialIconSet CERTUS = new MaterialIconSet(GTCEu.id("certus"), QUARTZ);
     public static final MaterialIconSet LAPIS = new MaterialIconSet(GTCEu.id("lapis"), QUARTZ);
     public static final MaterialIconSet FLUID = new MaterialIconSet(GTCEu.id("fluid"));
+    /** For fluids that should look like water: a fluid iconset of its own, with vanilla's water textures. */
+    public static final MaterialIconSet WATER = new MaterialIconSet(GTCEu.id("water"), FLUID);
+    /** For fluids that should look like lava. */
+    public static final MaterialIconSet LAVA = new MaterialIconSet(GTCEu.id("lava"), FLUID);
     public static final MaterialIconSet RADIOACTIVE = new MaterialIconSet(GTCEu.id("radioactive"), METALLIC);
+
+    static {
+        // vanilla's own, so these two look like what they are without GT shipping a copy of them
+        com.gregtechceu.gtceu.api.fluids.FluidBuilder.registerIconSetTextures(WATER,
+                new ResourceLocation("minecraft", "block/water_still"),
+                new ResourceLocation("minecraft", "block/water_flow"), true);
+        com.gregtechceu.gtceu.api.fluids.FluidBuilder.registerIconSetTextures(LAVA,
+                new ResourceLocation("minecraft", "block/lava_still"),
+                new ResourceLocation("minecraft", "block/lava_flow"), false);
+    }
 
     // Implementation -----------------------------------------------------------------------------------------------
 

@@ -20,6 +20,7 @@ import com.gregtechceu.gtceu.api.registry.GTRegistries;
 import com.gregtechceu.gtceu.api.registry.registrate.BuilderBase;
 import com.gregtechceu.gtceu.common.data.GTMedicalConditions;
 import com.gregtechceu.gtceu.integration.kjs.helpers.MaterialStackWrapper;
+import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.utils.FormattingUtil;
 import com.gregtechceu.gtceu.utils.GTMath;
 
@@ -179,6 +180,17 @@ public final class Material implements Comparable<Material> {
         if (!GTRegistries.MATERIALS.canModifyMaterials())
             throw new IllegalStateException("Cannot add flag to material when registry is frozen!");
         this.flags.addFlags(flags).verify(this);
+    }
+
+    /**
+     * Takes flags off the material, for addons and scripts that change a material somebody else made. Like adding, this
+     * can only be done until the registry is frozen. Flags that were added only because another flag needed them are
+     * not removed with it; remove those too.
+     */
+    public void removeFlags(MaterialFlag... flags) {
+        if (!GTRegistries.MATERIALS.canModifyMaterials())
+            throw new IllegalStateException("Cannot remove flag from material when registry is frozen!");
+        this.flags.removeFlags(flags);
     }
 
     public boolean hasFlag(MaterialFlag flag) {
@@ -556,6 +568,48 @@ public final class Material implements Comparable<Material> {
         properties.verify();
     }
 
+    /**
+     * Sets a property, replacing the one this material already has for the key. Unlike {@link #setProperty}, which
+     * only adds, this is the way to swap a property for another, for example a new {@code ToolProperty}.
+     */
+    public <T extends IMaterialProperty> void replaceProperty(PropertyKey<T> key, T property) {
+        if (!GTRegistries.MATERIALS.canModifyMaterials()) {
+            throw new IllegalStateException("Cannot change the properties of a Material when registry is frozen!");
+        }
+        properties.replaceProperty(key, property);
+        properties.verify();
+    }
+
+    /**
+     * Changes the property in place, adding a default one first if the material has none:
+     * {@code material.modifyProperty(PropertyKey.TOOL, tool -> tool.setDurability(2000))}.
+     */
+    public <T extends IMaterialProperty> T modifyProperty(PropertyKey<T> key, java.util.function.Consumer<T> modifier) {
+        if (!GTRegistries.MATERIALS.canModifyMaterials()) {
+            throw new IllegalStateException("Cannot change the properties of a Material when registry is frozen!");
+        }
+        return properties.modifyProperty(key, modifier);
+    }
+
+    /**
+     * Changes how one of this material's fluids will be built, for example its textures or colour:
+     * {@code Iron.modifyFluid(FluidStorageKeys.LIQUID, fluid -> fluid.iconSet(MyIconSets.EMBER))}. Only works while
+     * materials can still be modified, before their fluids are registered.
+     *
+     * @throws IllegalArgumentException if the material has no such fluid
+     */
+    public void modifyFluid(FluidStorageKey key, java.util.function.Consumer<FluidBuilder> modifier) {
+        if (!GTRegistries.MATERIALS.canModifyMaterials()) {
+            throw new IllegalStateException("Cannot change the fluids of a Material when registry is frozen!");
+        }
+        var property = getProperty(PropertyKey.FLUID);
+        FluidBuilder builder = property == null ? null : property.getQueuedBuilder(key);
+        if (builder == null) {
+            throw new IllegalArgumentException("Material " + this + " has no " + key + " fluid to change");
+        }
+        modifier.accept(builder);
+    }
+
     public boolean isSolid() {
         return hasProperty(PropertyKey.INGOT) || hasProperty(PropertyKey.GEM);
     }
@@ -564,7 +618,27 @@ public final class Material implements Comparable<Material> {
         return hasProperty(PropertyKey.FLUID);
     }
 
+    /**
+     * The properties the config asks every Material to have. Done after material modification, so what addons and
+     * scripts add is counted, and before verification and fluid registration.
+     */
+    private void applyConfiguredProperties() {
+        var config = ConfigHolder.getInstance().materials;
+        if (config.allElementsHaveIngotsAndDusts && getElement() != null) {
+            properties.ensureSet(PropertyKey.DUST);
+            properties.ensureSet(PropertyKey.INGOT);
+        }
+        if (config.moltenFluidForAllIngots && properties.hasProperty(PropertyKey.INGOT)) {
+            var fluid = properties.ensureSet(PropertyKey.FLUID);
+            if (fluid.getQueuedBuilder(FluidStorageKeys.LIQUID) == null &&
+                    fluid.getQueuedBuilder(FluidStorageKeys.MOLTEN) == null) {
+                fluid.enqueueRegistration(FluidStorageKeys.LIQUID, new FluidBuilder().state(FluidState.LIQUID));
+            }
+        }
+    }
+
     public void verifyMaterial() {
+        applyConfiguredProperties();
         properties.verify();
         flags.verify(this);
         this.chemicalFormula = calculateChemicalFormula();

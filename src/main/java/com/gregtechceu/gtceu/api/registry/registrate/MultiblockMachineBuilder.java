@@ -42,6 +42,7 @@ public class MultiblockMachineBuilder<DEFINITION extends MultiblockMachineDefini
 
     private boolean generator;
     private Map<String, Function<MultiblockMachineDefinition, IBlockPattern>> patterns;
+    private final Map<String, com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind> kinds = new java.util.HashMap<>();
     private boolean allowFlip = true;
     private final List<Supplier<ItemStack[]>> recoveryItems = new ArrayList<>();
     private Function<MultiblockControllerMachine, Comparator<MultiblockPartMachine>> partSorter = (c) -> (a, b) -> 0;
@@ -59,7 +60,8 @@ public class MultiblockMachineBuilder<DEFINITION extends MultiblockMachineDefini
         super(registrate, name, (loc -> (DEFINITION) new MultiblockMachineDefinition(loc)),
                 blockFactory,
                 itemFactory, blockEntityFactory);
-        patterns = new Object2ReferenceOpenHashMap<>();
+        // in the order they were added: previews and menus list them in this order
+        patterns = new java.util.LinkedHashMap<>();
         allowExtendedFacing(true);
         allowCoverOnFront(true);
         // always add the formed property to multi controllers
@@ -78,6 +80,18 @@ public class MultiblockMachineBuilder<DEFINITION extends MultiblockMachineDefini
 
     public SELF pattern(String structureName, Function<MultiblockMachineDefinition, IBlockPattern> pattern) {
         this.patterns.put(structureName, pattern);
+        return getThis();
+    }
+
+    /**
+     * Adds a structure that is built on top of the main one instead of in its place, such as an optional extension. The
+     * pattern is anchored on the controller like any other and only has to check the blocks it adds; everything else
+     * can be left to {@code Predicates.any()}. Previews show it with the main structure and the terminal builds it with
+     * it. See {@link com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind#ADDITION}.
+     */
+    public SELF additionalPattern(String structureName, Function<MultiblockMachineDefinition, IBlockPattern> pattern) {
+        this.patterns.put(structureName, pattern);
+        this.kinds.put(structureName, com.gregtechceu.gtceu.api.multiblock.pattern.StructureKind.ADDITION);
         return getThis();
     }
 
@@ -126,9 +140,17 @@ public class MultiblockMachineBuilder<DEFINITION extends MultiblockMachineDefini
         if (patterns.isEmpty()) {
             throw new IllegalStateException("Missing default structure pattern for " + name);
         }
+        // the default structure first, then the others as they were added
+        var defaultPattern = patterns.get(MultiblockControllerMachine.DEFAULT_STRUCTURE);
+        if (defaultPattern != null) {
+            definition.setPattern(MultiblockControllerMachine.DEFAULT_STRUCTURE,
+                    GTMemoizer.memoize(() -> defaultPattern.apply(definition)));
+        }
         for (Map.Entry<String, Function<MultiblockMachineDefinition, IBlockPattern>> entry : patterns.entrySet()) {
+            if (entry.getKey().equals(MultiblockControllerMachine.DEFAULT_STRUCTURE)) continue;
             definition.setPattern(entry.getKey(), GTMemoizer.memoize(() -> entry.getValue().apply(definition)));
         }
+        kinds.forEach(definition::setStructureKind);
 
         definition.setAllowFlip(allowFlip);
         if (!recoveryItems.isEmpty()) {

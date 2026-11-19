@@ -1,6 +1,7 @@
 package com.gregtechceu.gtceu.common.network.packets;
 
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
+import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
 import com.gregtechceu.gtceu.api.mui.MultiblockSchemaInfo;
 import com.gregtechceu.gtceu.api.multiblock.util.BlockInfo;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
@@ -34,6 +35,14 @@ public class CPacketTerminalSettings implements GTNetwork.INetPacket {
     boolean isClearMulti;
     boolean isClearPreferences;
     boolean ignorePreviewCount;
+    String structure = MultiblockControllerMachine.DEFAULT_STRUCTURE;
+    java.util.List<String> overlays = java.util.List.of();
+
+    public CPacketTerminalSettings structure(String structure, java.util.List<String> overlays) {
+        this.structure = structure;
+        this.overlays = overlays;
+        return this;
+    }
 
     public CPacketTerminalSettings(InteractionHand hand, MultiblockMachineDefinition def, Int2IntMap sliceRepeats,
                                    IntList dimensions,
@@ -78,6 +87,8 @@ public class CPacketTerminalSettings implements GTNetwork.INetPacket {
         this.isClearMulti = buf.readBoolean();
         this.isClearPreferences = buf.readBoolean();
         this.ignorePreviewCount = buf.readBoolean();
+        this.structure = buf.readUtf();
+        this.overlays = buf.readCollection(java.util.ArrayList::new, FriendlyByteBuf::readUtf);
     }
 
     @Override
@@ -95,6 +106,8 @@ public class CPacketTerminalSettings implements GTNetwork.INetPacket {
         buf.writeBoolean(this.isClearMulti);
         buf.writeBoolean(this.isClearPreferences);
         buf.writeBoolean(this.ignorePreviewCount);
+        buf.writeUtf(this.structure);
+        buf.writeCollection(this.overlays, FriendlyByteBuf::writeUtf);
     }
 
     @Override
@@ -106,7 +119,8 @@ public class CPacketTerminalSettings implements GTNetwork.INetPacket {
         if (!GTItems.TERMINAL.isIn(held)) return;
 
         var schemaInfo = new MultiblockSchemaInfo(this.machineDefinition, this.sliceRepeats, this.dimensions,
-                this.globalPreferences, this.blockPreferences, this.isFlipped, this.ignorePreviewCount);
+                this.globalPreferences, this.blockPreferences, this.isFlipped, this.ignorePreviewCount,
+                this.structure, this.overlays);
         TerminalBehavior.applyUserPreferences(held, schemaInfo, this.isClearMulti, this.isClearPreferences);
     }
 }

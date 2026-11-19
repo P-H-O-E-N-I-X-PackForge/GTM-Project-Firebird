@@ -4,7 +4,7 @@ import com.gregtechceu.gtceu.GTCEu;
 import com.gregtechceu.gtceu.api.machine.trait.notifiable.NotifiableFluidTank;
 import com.gregtechceu.gtceu.api.machine.trait.notifiable.NotifiableItemStackHandler;
 
-import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.IItemHandlerModifiable;
 
 import brachy.modularui.value.sync.ItemSlotSyncHandler;
 import brachy.modularui.value.sync.PanelSyncManager;
@@ -22,13 +22,14 @@ public class GTMuiMachineUtil {
 
     private static AtomicBoolean currentLogSpam = new AtomicBoolean(false);
 
-    public static SlotGroupWidget createSlotGroupFromInventory(IItemHandler itemHandler, String slotGroupName,
+    public static SlotGroupWidget createSlotGroupFromInventory(IItemHandlerModifiable itemHandler,
+                                                               String slotGroupName,
                                                                int maxSlots, char key, PanelSyncManager syncManager,
                                                                String... matrix) {
         return createSlotGroupFromInventory(itemHandler, slotGroupName, maxSlots, key, i -> i, syncManager, matrix);
     }
 
-    public static SlotGroupWidget createSlotGroupFromInventory(IItemHandler itemHandler,
+    public static SlotGroupWidget createSlotGroupFromInventory(IItemHandlerModifiable itemHandler,
                                                                String slotGroupName, int maxSlots, char key,
                                                                UnaryOperator<ItemSlot> slotModifier,
                                                                PanelSyncManager syncManager,
@@ -60,10 +61,26 @@ public class GTMuiMachineUtil {
         return matrix;
     }
 
-    public static SlotGroupWidget createSquareSlotGroupFromInventory(IItemHandler itemHandler,
+    public static SlotGroupWidget createSquareSlotGroupFromInventory(IItemHandlerModifiable itemHandler,
                                                                      String slotGroupName,
                                                                      PanelSyncManager syncManager) {
-        return createSlotGroupFromInventory(itemHandler, slotGroupName, itemHandler.getSlots(), 'I', syncManager,
+        return createSquareSlotGroupFromInventory(itemHandler, slotGroupName, i -> i, syncManager);
+    }
+
+    public static SlotGroupWidget createSquareSlotGroupFromInventory(IItemHandlerModifiable itemHandler,
+                                                                     String slotGroupName,
+                                                                     UnaryOperator<ItemSlot> slotModifier,
+                                                                     PanelSyncManager syncManager) {
+        return createSlotGroupFromInventory(itemHandler, slotGroupName, itemHandler.getSlots(), 'I', slotModifier,
+                syncManager, createSquareMatrix(itemHandler.getSlots(), 'I'));
+    }
+
+    public static SlotGroupWidget createSquareSlotGroupFromInventory(IItemHandlerModifiable itemHandler,
+                                                                     String slotGroupName,
+                                                                     PanelSyncManager syncManager,
+                                                                     UnaryOperator<ItemSlot> slotModifier) {
+        return createSlotGroupFromInventory(itemHandler, slotGroupName, itemHandler.getSlots(), 'I', slotModifier,
+                syncManager,
                 createSquareMatrix(itemHandler.getSlots(), 'I'));
     }
 
@@ -72,7 +89,10 @@ public class GTMuiMachineUtil {
                                                                String syncHandlerName, int maxSlots, char key,
                                                                String... matrix) {
         for (int i = 0; i < maxSlots; i++) {
-            syncManager.syncValue(syncHandlerName, i, SyncHandlers.fluidSlot(fluidTank.getStorages()[i]));
+            // through a guard, which lets nothing through while the hatch is locked
+            syncManager.syncValue(syncHandlerName, i, SyncHandlers.fluidSlot(
+                    new com.gregtechceu.gtceu.api.transfer.fluid.GuardedFluidTank(fluidTank.getStorages()[i],
+                            fluidTank::isIODisabled)));
         }
 
         return SlotGroupWidget.builder()

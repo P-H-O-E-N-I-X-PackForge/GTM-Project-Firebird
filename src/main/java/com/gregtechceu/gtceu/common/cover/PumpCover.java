@@ -91,7 +91,8 @@ public class PumpCover extends CoverBehavior implements IIOCover, IMuiCover, ICo
         super(definition, coverHolder, attachedSide);
         this.tier = tier;
 
-        this.maxFluidTransferRate = maxTransferRate;
+        this.maxFluidTransferRate = com.gregtechceu.gtceu.api.cover.CoverTransferRates
+                .apply(com.gregtechceu.gtceu.api.cover.CoverTransferRates.Kind.FLUID, tier, maxTransferRate);
         this.transferRate = maxFluidTransferRate;
         this.mBLeftToTransferLastSecond = transferRate * 20;
 

@@ -70,7 +70,14 @@ public class RecipeRunner {
             return ActionResult.PASS_NO_CONTENTS;
         }
 
-        return this.handleContents();
+        if (simulated) return this.handleContents();
+        // the real handling takes its inputs and puts its outputs one handler after another: if it does not get all
+        // the way, what it did is taken back instead of kept, which voided the inputs of a recipe with no room left
+        try (var transaction = RecipeTransaction.begin()) {
+            var result = this.handleContents();
+            if (result.isSuccess()) transaction.commit();
+            return result;
+        }
     }
 
     /**

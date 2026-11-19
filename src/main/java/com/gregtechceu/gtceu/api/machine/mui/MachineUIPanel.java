@@ -17,19 +17,65 @@ import brachy.modularui.widget.ParentWidget;
 import brachy.modularui.widgets.SlotGroupWidget;
 import brachy.modularui.widgets.layout.Flow;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
 
+    /** The column that holds the main contents and, under them, the player inventory when there is one. */
+    @lombok.Getter
+    private Flow contentsColumn;
+    /**
+     * Takes the UI back to its main page: what a tab of the machine's own does, for the ones an addon puts on the
+     * panel.
+     */
+    @Setter
+    private Runnable showMainPage = () -> {};
+
     public static final int DEFAULT_CONTENT_WIDTH = 169;
     public static final int DEFAULT_CONTENT_HEIGHT = 77;
 
     @Getter
-    protected final Flow leftConfiguratorPanel, rightConfiguratorPanel;
+    protected final Flow leftConfiguratorPanel;
+    protected final Flow rightConfiguratorPanel;
+
+    /**
+     * There is no column on the right: the configurators are all in the one on the left. This is that column, so that
+     * code that adds to the right one ends up on the left.
+     */
+    public Flow getRightConfiguratorPanel() {
+        return leftConfiguratorPanel;
+    }
+
     @Getter
     protected final ParentWidget<?> mainContents;
+
+    /**
+     * The panel is drawn smaller when it is too big for the window, so a large UI still fits on the screen. This adds
+     * to
+     * the scale ModularUI uses for the opening animation, and its hit testing follows it. See
+     * {@code ConfigHolder#scaleOversizedMachineUis}.
+     */
+    @Override
+    public float getScale() {
+        float scale = super.getScale();
+        if (!com.gregtechceu.gtceu.GTCEu.isClientSide()) return scale;
+        var config = com.gregtechceu.gtceu.config.ConfigHolder.INSTANCE.client;
+        if (!config.scaleOversizedMachineUis) return scale;
+        var area = getArea();
+        if (area.w() <= 0 || area.h() <= 0) return scale;
+        var window = net.minecraft.client.Minecraft.getInstance().getWindow();
+        float fit = Math.min((window.getGuiScaledWidth() - 12f) / area.w(),
+                (window.getGuiScaledHeight() - 12f) / area.h());
+        if (fit >= 1f) return scale;
+        return scale * Math.max(fit, Math.max(0.2f, Math.min(1f, config.machineUiMinScale)));
+    }
+
+    public void showMainPage() {
+        showMainPage.run();
+    }
 
     public MachineUIPanel(MetaMachine machine, PosGuiData data, UISettings settings, boolean attachPlayerInventory,
                           boolean addTitleBar, boolean drawGTLogo, UITexture gtLogoTexture) {
@@ -37,13 +83,14 @@ public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
 
         UITexture themeBackground = null;
         if (!machine.getDefinition().getThemeId().equals(ThemeAPI.DEFAULT_ID)) {
-            themeBackground = (UITexture) ThemeAPI.INSTANCE.getTheme(machine.getDefinition().getThemeId())
+            // not always a texture, as after the resources are reloaded: then it is the default one
+            themeBackground = ThemeAPI.INSTANCE.getTheme(machine.getDefinition().getThemeId())
                     .getPanelTheme()
-                    .theme().getBackground();
+                    .theme().getBackground() instanceof UITexture texture ? texture : null;
         }
         if (themeBackground == null) {
-            themeBackground = (UITexture) ThemeAPI.INSTANCE.getTheme(settings.getTheme()).getPanelTheme()
-                    .theme().getBackground();
+            themeBackground = ThemeAPI.INSTANCE.getTheme(settings.getTheme()).getPanelTheme()
+                    .theme().getBackground() instanceof UITexture texture ? texture : null;
         }
 
         if (themeBackground == null) themeBackground = GTGuiTextures.BACKGROUND;
@@ -92,6 +139,7 @@ public class MachineUIPanel extends ModularPanel<MachineUIPanel> {
                 })));
 
         Flow panelContents = Flow.col().coverChildren();
+        this.contentsColumn = panelContents;
         panelContents.margin(4);
         mainContents = new ParentWidget<>().coverChildren(DEFAULT_CONTENT_WIDTH, DEFAULT_CONTENT_HEIGHT);
 
