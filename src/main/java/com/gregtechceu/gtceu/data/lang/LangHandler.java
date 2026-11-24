@@ -170,6 +170,7 @@ public class LangHandler {
         provider.add("gtceu.multiblock.preview.grid.marks", "Marks: every %s blocks");
         provider.add("gtceu.multiblock.preview.grid.hint", "Click to show or hide it, right-click to change the marks");
         provider.add("gtceu.multiblock.preview.turntable", "Turntable: keeps turning the view");
+        provider.add("gtceu.multiblock.preview.right_click_recipes", "Right-click: recipes (Shift: uses)");
         provider.add("gtceu.jade.hatch_locked", "Locked");
         provider.add("gtceu.terminal.report.nothing", "Nothing to build.");
         provider.add("gtceu.terminal.report.success", "Built %s blocks.");

@@ -119,6 +119,16 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
     @Getter
     private boolean terminal;
 
+    /** An item's tooltip with every line ended, so whatever is added after it starts on a line of its own. */
+    private static void addItemTooltip(brachy.modularui.screen.RichTooltip text, ItemStack stack) {
+        var lines = net.minecraft.client.gui.screens.Screen.getTooltipFromItem(
+                net.minecraft.client.Minecraft.getInstance(), stack);
+        if (lines.isEmpty()) return;
+        text.addLine(lines.get(0));
+        if (lines.size() > 1) text.spaceLine();
+        for (int i = 1; i < lines.size(); i++) text.addLine(lines.get(i));
+    }
+
     // what the player chose last stays for the next preview that is opened
     private static com.gregtechceu.gtceu.api.mui.PreviewMode defaultMode = com.gregtechceu.gtceu.api.mui.PreviewMode.FORMED;
     private static boolean defaultGrid = false;
@@ -165,6 +175,18 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
         resolveHiddenBlocks();
 
         IGuiAction.MouseReleased setBlockOnClick = (ctx, m) -> {
+            if (m == InputConstants.MOUSE_BUTTON_RIGHT) {
+                BlockHitResult rayTrace = schemaRenderer.lastRayTrace();
+                if (rayTrace != null && rayTrace.getType() == HitResult.Type.BLOCK) {
+                    var level = this.multiblockSchemaInfo.getMapSchema().getLevel();
+                    BlockState state = level.getBlockState(rayTrace.getBlockPos());
+                    ItemStack picked = state.getCloneItemStack(rayTrace, level, rayTrace.getBlockPos(),
+                            this.getContext().getMC().player);
+                    return com.gregtechceu.gtceu.integration.recipeviewer.GTViewerLookup.show(picked,
+                            net.minecraft.client.gui.screens.Screen.hasShiftDown());
+                }
+                return false;
+            }
             if (m == InputConstants.MOUSE_BUTTON_LEFT) {
                 BlockHitResult rayTrace = schemaRenderer.lastRayTrace();
                 if (rayTrace != null && rayTrace.getType() == HitResult.Type.BLOCK) {
@@ -311,7 +333,7 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                         ItemStack pickedItem = state.getCloneItemStack(hit,
                                 this.getMultiblockSchemaInfo().getMapSchema().getLevel(), hit.getBlockPos(),
                                 this.getContext().getMC().player);
-                        text.addFromItem(pickedItem);
+                        addItemTooltip(text, pickedItem);
                         IBlockPattern value = this.multiblockSchemaInfo.getPattern();
                         context.updateLevel(this.multiblockSchemaInfo.getMapSchema().getLevel());
                         context.updatePos(hit.getBlockPos());
@@ -321,8 +343,12 @@ public class MultiblockPreviewWidget extends ParentWidget<MultiblockPreviewWidge
                             root.resetLogic();
                             BasePredicate predicate = root.getPredicateAtPos(context).match();
                             if (predicate != null) {
-                                predicate.getRecipeViewerTooltips(root).forEach(t -> text.add(t).newLine());
+                                var extra = predicate.getRecipeViewerTooltips(root);
+                                if (!extra.isEmpty()) text.spaceLine();
+                                extra.forEach(text::addLine);
                             }
+                            text.addLine(Component.translatable("gtceu.multiblock.preview.right_click_recipes")
+                                    .withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
                         } catch (RuntimeException ignored) {
                             // a block of an overlaid structure
                         }

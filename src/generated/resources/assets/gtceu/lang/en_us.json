@@ -3544,6 +3544,7 @@
   "gtceu.multiblock.preview.rotate": "Rotate the structure",
   "gtceu.multiblock.preview.rotate.hint": "Click to turn it right, right-click to turn it left",
   "gtceu.multiblock.preview.select": "Right-click to check candidates",
+  "gtceu.multiblock.preview.right_click_recipes": "Right-click: recipes (Shift: uses)",
   "gtceu.multiblock.preview.turntable": "Turntable: keeps turning the view",
   "gtceu.multiblock.preview.zoom": "Use mousewheel or right-click + drag to zoom",
   "gtceu.multiblock.primitive_blast_furnace.bronze.description": "The Primitive Blast Furnace (PBF) is a multiblock structure used for cooking steel in the early game. Although not very fast, it will provide you with steel for your first setups.",
